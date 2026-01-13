@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:news_aggregator/screens/crawler_results_screen.dart';
 
 import 'screens/main_screen.dart';
 
@@ -16,8 +17,20 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontSize: 16.0),
+          bodyMedium: TextStyle(fontSize: 14.0),
+          titleLarge: TextStyle(fontSize: 22.0, fontWeight: FontWeight.bold),
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 12.0,
+            vertical: 16.0,
+          ),
+        ),
       ),
-      home: const NewsAggregatorApp(),
+      home: const CrawlerResultsPage(),
     );
   }
 }

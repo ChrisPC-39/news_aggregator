@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:news_aggregator/services/crawler_service.dart';
+
+import 'news_results_page.dart';
 
 void main() {
   runApp(const NewsAggregatorApp());
@@ -10,25 +13,7 @@ class NewsAggregatorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'News Aggregator',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        // Using the new TextTheme properties
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(fontSize: 16.0),
-          bodyMedium: TextStyle(fontSize: 14.0),
-          titleLarge: TextStyle(fontSize: 22.0, fontWeight: FontWeight.bold),
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(
-              horizontal: 12.0, vertical: 16.0),
-        ),
-        useMaterial3: true,
-      ),
-      home: const SearchSettingsPage(),
-    );
+    return const SearchSettingsPage();
   }
 }
 
@@ -45,7 +30,7 @@ class _SearchSettingsPageState extends State<SearchSettingsPage> {
   final _sourcesController = TextEditingController();
   final _domainsController = TextEditingController();
   final _excludeDomainsController = TextEditingController();
-  final _pageSizeController = TextEditingController(text: '100');
+  final _pageSizeController = TextEditingController(text: '10');
   final _pageController = TextEditingController(text: '1');
 
   // State for checkboxes
@@ -56,11 +41,11 @@ class _SearchSettingsPageState extends State<SearchSettingsPage> {
   };
 
   // State for dates
-  DateTime? _fromDate;
-  DateTime? _toDate;
+  DateTime _fromDate = DateTime.utc(DateTime.now().year, DateTime.now().month, DateTime.now().day - 7);
+  DateTime _toDate = DateTime.now();
 
   // State for dropdowns
-  String? _language;
+  String _language = 'ro';
   String _sortBy = 'publishedAt';
 
   final _formKey = GlobalKey<FormState>();
@@ -239,24 +224,12 @@ class _SearchSettingsPageState extends State<SearchSettingsPage> {
                     hint: const Text('Select Language'),
                     onChanged: (String? newValue) {
                       setState(() {
-                        _language = newValue;
+                        _language = newValue!;
                       });
                     },
                     items: [
-                      'ar',
-                      'de',
                       'en',
-                      'es',
-                      'fr',
-                      'he',
-                      'it',
-                      'nl',
-                      'no',
-                      'pt',
-                      'ru',
-                      'sv',
-                      'ud',
-                      'zh'
+                      'ro'
                     ]
                         .map<DropdownMenuItem<String>>((String value) {
                       return DropdownMenuItem<String>(
@@ -321,13 +294,31 @@ class _SearchSettingsPageState extends State<SearchSettingsPage> {
                   icon: const Icon(Icons.search),
                   label: const Text('Apply Filters'),
                   onPressed: () {
-                    // You can access all the values here and pass them to your API call
-                    // For example:
-                    // final query = _qController.text;
-                    // final sortBy = _sortBy;
-                    // ... and so on for all other fields.
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Search filters applied!')),
+                    final String searchIn = _searchInOptions.entries
+                        .where((entry) => entry.value)
+                        .map((entry) => entry.key)
+                        .join(',');
+
+                    final Map<String, dynamic> searchParams = {
+                      'q': _qController.text,
+                      'searchIn': searchIn,
+                      'sources': _sourcesController.text,
+                      'domains': _domainsController.text,
+                      'excludeDomains': _excludeDomainsController.text,
+                      'from': _fromDate,
+                      'to': _toDate,
+                      'language': _language,
+                      'sortBy': _sortBy,
+                      'pageSize': _pageSizeController.text,
+                      'page': _pageController.text,
+                    };
+
+                    // 2. Navigate to the results page, passing the parameters
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NewsResultsPage(searchParams: searchParams),
+                      ),
                     );
                   },
                   style: ElevatedButton.styleFrom(

@@ -3,10 +3,35 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart';
+import 'package:news_aggregator/services/score_service.dart';
 import '../globals.dart';
 import '../models/article_model.dart';
+import '../models/news_story_model.dart';
 
 class CrawlerService {
+  Future<List<NewsStory>> fetchGroupedStories() async {
+    ScoreService scoreService = ScoreService();
+
+    final articles = await fetchAllSources();
+    final unique = removeDuplicateArticles(articles);
+    return scoreService.groupArticles(unique);
+  }
+
+  List<Article> removeDuplicateArticles(List<Article> articles) {
+    final seen = <String>{};
+    final uniqueArticles = <Article>[];
+
+    for (var article in articles) {
+      final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+      if (!seen.contains(key)) {
+        seen.add(key);
+        uniqueArticles.add(article);
+      }
+    }
+
+    return uniqueArticles;
+  }
+
   Future<List<Article>> fetchAllSources() async {
     List<Article> allArticles = [];
     for (var url in Globals.urls) {
@@ -62,21 +87,9 @@ class CrawlerService {
           articles = [];
       }
 
-      // Deduplicate articles by title per domain
-      final seen = <String>{};
-      final uniqueArticles = <Article>[];
-
-      for (var article in articles) {
-        final key = '$domain::${article.title.trim().toLowerCase()}';
-        if (!seen.contains(key)) {
-          seen.add(key);
-          uniqueArticles.add(article);
-        }
-      }
-
-      return uniqueArticles;
+      return removeDuplicateArticles(articles);
     } catch (e) {
-      print('Error crawling $url: $e');
+      // print('Error crawling $url: $e');
       return [];
     }
   }
@@ -104,7 +117,7 @@ class CrawlerService {
 
         articles.add(
           Article(
-            title: title,
+            title: Globals.cleanTitle(title),
             description: description,
             url: link.startsWith('http') ? link : 'https://adevarul.ro$link',
             urlToImage: imageUrl,
@@ -248,20 +261,14 @@ class CrawlerService {
         final img = item.querySelector('picture img');
         final imageUrl = img?.attributes['src'] ?? img?.attributes['data-src'];
 
-        // Category (optional)
-        final category = item.querySelector('.category-label')?.text.trim();
-
         articles.add(
           Article(
             title: title,
             description: '',
-            // Libertatea listings don't include excerpts
             url: link,
             urlToImage: imageUrl,
             publishedAt: DateTime.now(),
             sourceName: 'Libertatea',
-            // If your model supports it:
-            // category: category,
           ),
         );
       } catch (_) {

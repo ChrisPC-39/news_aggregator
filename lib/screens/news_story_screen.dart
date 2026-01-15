@@ -27,13 +27,20 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   int minimumSources = 2;
 
   late Stream<List<NewsStory>> _storiesStream;
+  bool _isLoading = true; // Track loading state
 
   @override
   void initState() {
     super.initState();
-    // _crawlerService.fetchAllSources();
     _scrollController.addListener(_onScroll);
     _storiesStream = _crawlerService.watchGroupedStories().asBroadcastStream();
+
+    // Listen to processing status from CrawlerService
+    _crawlerService.isProcessing.listen((isProcessing) {
+      if (mounted) {
+        setState(() => _isLoading = isProcessing);
+      }
+    });
   }
 
   void _onScroll() {
@@ -86,6 +93,18 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
               },
             ),
           ],
+          // Add loading indicator at bottom of AppBar
+          bottom: PreferredSize(
+            preferredSize: Size.fromHeight(_isLoading ? 3 : 0),
+            child: _isLoading
+                ? LinearProgressIndicator(
+              backgroundColor: Colors.white.withOpacity(0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Colors.white.withOpacity(0.8),
+              ),
+            )
+                : const SizedBox.shrink(),
+          ),
         ),
         body: Stack(
           children: [
@@ -110,46 +129,45 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                 if (stories.isEmpty) {
                   return Center(
                     child:
-                        _searchQuery.isNotEmpty
-                            ? Text('No stories match "$_searchQuery"')
-                            : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text('No news found.'),
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                      _searchQuery = '';
-                                      selectedCategories.clear();
-                                      minimumSources = 1;
-                                    });
-                                  },
-                                  child: const Text('Clear filters'),
-                                ),
-                              ],
-                            ),
+                    _searchQuery.isNotEmpty
+                        ? Text('No stories match "$_searchQuery"')
+                        : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('No news found.'),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                              selectedCategories.clear();
+                              minimumSources = 1;
+                            });
+                          },
+                          child: const Text('Clear filters'),
+                        ),
+                      ],
+                    ),
                   );
                 }
 
-                return Positioned.fill(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(
-                      top: 8,
-                      bottom: 80,
-                      left: 8,
-                      right: 8,
-                    ),
-                    itemCount: stories.length,
-                    itemBuilder: (context, index) {
-                      final story = stories[index];
-                      final sources =
-                          story.articles.map((a) => a.sourceName).toList();
-
-                      return buildNewsStoryCard(context, story, sources);
-                    },
+                // FIXED: Remove Positioned.fill, return ListView directly
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(
+                    top: 8,
+                    bottom: 80,
+                    left: 8,
+                    right: 8,
                   ),
+                  itemCount: stories.length,
+                  itemBuilder: (context, index) {
+                    final story = stories[index];
+                    final sources =
+                    story.articles.map((a) => a.sourceName).toList();
+
+                    return buildNewsStoryCard(context, story, sources);
+                  },
                 );
               },
             ),
@@ -210,8 +228,8 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
         return story.canonicalTitle.toLowerCase().contains(q) ||
             (story.summary?.toLowerCase().contains(q) ?? false) ||
             story.articles.any(
-              (a) =>
-                  a.title.toLowerCase().contains(q) ||
+                  (a) =>
+              a.title.toLowerCase().contains(q) ||
                   a.description.toLowerCase().contains(q),
             );
       }
@@ -221,10 +239,10 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   Widget buildNewsStoryCard(
-    BuildContext context,
-    NewsStory story,
-    List<String> sources,
-  ) {
+      BuildContext context,
+      NewsStory story,
+      List<String> sources,
+      ) {
     int leftCount =
         sources.where((s) => Globals.leftSources.contains(s)).length;
     int centerCount =
@@ -264,9 +282,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             SizedBox(
               width: double.infinity,
               height:
-                  story.imageUrl != null && story.imageUrl!.isNotEmpty
-                      ? 200
-                      : 35,
+              story.imageUrl != null && story.imageUrl!.isNotEmpty
+                  ? 200
+                  : 35,
               child: Stack(
                 children: [
                   if (story.imageUrl != null && story.imageUrl!.isNotEmpty)

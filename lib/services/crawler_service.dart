@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // For compute()
 
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
@@ -11,10 +12,30 @@ import '../models/news_story_model.dart';
 import 'firebase_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
 
+// Top-level function for isolate
+class _GroupingParams {
+  final List<NewsStory> initialStories;
+  final List<Article> articles;
+
+  _GroupingParams(this.initialStories, this.articles);
+}
+
+List<NewsStory> _groupArticlesInIsolate(_GroupingParams params) {
+  final scoreService = ScoreService();
+  return scoreService.groupArticlesIncremental(
+    params.initialStories,
+    params.articles,
+  );
+}
+
 class CrawlerService {
   final repo = FirebaseArticleRepository();
   final scoreService = ScoreService();
   final GroupedStoriesCacheService cache = GroupedStoriesCacheService();
+
+  // StreamController to notify when processing is complete
+  final _processingController = StreamController<bool>.broadcast();
+  Stream<bool> get isProcessing => _processingController.stream;
 
   /// Watch Firestore and return cached + updated grouped stories
   Stream<List<NewsStory>> watchGroupedStories() {
@@ -27,14 +48,18 @@ class CrawlerService {
 
     // 3️⃣ Listen to Firestore in background
     repo.watchArticles().listen((articles) async {
+      // Notify that processing has started
+      _processingController.add(true);
+
       final unique = removeDuplicateArticles(articles);
 
-      // Incremental grouping
-      final grouped = scoreService.groupArticlesIncremental(
-        initialStories,
-        unique,
+      // ✅ Run heavy computation in background isolate
+      final grouped = await compute(
+        _groupArticlesInIsolate,
+        _GroupingParams(initialStories, unique),
       );
 
+      // Deduplicate articles within each story
       for (var story in grouped) {
         final seen = <String>{};
         story.articles.retainWhere((article) {
@@ -49,7 +74,12 @@ class CrawlerService {
       await cache.save(grouped);
 
       // Emit updated stream
-      controller.add(grouped);
+      if (!controller.isClosed) {
+        controller.add(grouped);
+      }
+
+      // Notify that processing is complete
+      _processingController.add(false);
     });
 
     return controller.stream;
@@ -86,7 +116,7 @@ class CrawlerService {
         Uri.parse(url),
         headers: {
           'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       );
 
@@ -120,13 +150,11 @@ class CrawlerService {
           articles = parseAntena3(document);
           break;
         default:
-          // print('No parser defined for domain: $domain');
           articles = [];
       }
 
       return removeDuplicateArticles(articles);
     } catch (e) {
-      // print('Error crawling $url: $e');
       return [];
     }
   }
@@ -144,8 +172,8 @@ class CrawlerService {
 
         final imgElement =
             container.querySelector('.cover img') ??
-            container.querySelector('.poster img') ??
-            container.querySelector('img');
+                container.querySelector('.poster img') ??
+                container.querySelector('img');
 
         final imageUrl = imgElement?.attributes['src'];
 
@@ -162,7 +190,6 @@ class CrawlerService {
           ),
         );
       } catch (_) {
-        // Skip broken article blocks
         continue;
       }
     }
@@ -177,27 +204,23 @@ class CrawlerService {
 
     for (final article in articleNodes) {
       try {
-        // Title + Link
         final titleAnchor = article.querySelector('h2.entry-title a');
         final title = titleAnchor?.text.trim() ?? '';
         final link = titleAnchor?.attributes['href'];
 
         if (title.isEmpty || link == null) continue;
 
-        // Description (optional)
         final description =
             article.querySelector('a.entry-excerpt')?.text.trim() ?? '';
 
-        // Image
         final imageUrl =
-            article
-                .querySelector('figure.post-thumbnail img')
-                ?.attributes['src'];
+        article
+            .querySelector('figure.post-thumbnail img')
+            ?.attributes['src'];
 
-        // Published date
         DateTime publishedAt = DateTime.now();
         final datetimeAttr =
-            article.querySelector('time.entry-date')?.attributes['datetime'];
+        article.querySelector('time.entry-date')?.attributes['datetime'];
 
         if (datetimeAttr != null) {
           publishedAt = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
@@ -214,7 +237,6 @@ class CrawlerService {
           ),
         );
       } catch (_) {
-        // Skip malformed articles safely
         continue;
       }
     }
@@ -229,7 +251,6 @@ class CrawlerService {
 
     for (final article in articleNodes) {
       try {
-        // Title + link (works for h2 and h3)
         final titleAnchor = article.querySelector('.article-title a');
         final title = titleAnchor?.text.trim() ?? '';
         final relativeLink = titleAnchor?.attributes['href'];
@@ -237,24 +258,21 @@ class CrawlerService {
         if (title.isEmpty || relativeLink == null) continue;
 
         final url =
-            relativeLink.startsWith('http')
-                ? relativeLink
-                : 'https://www.digi24.ro$relativeLink';
+        relativeLink.startsWith('http')
+            ? relativeLink
+            : 'https://www.digi24.ro$relativeLink';
 
-        // Description (optional)
         final description =
             article.querySelector('.article-intro')?.text.trim() ?? '';
 
-        // Image
         final imageUrl =
-            article
-                .querySelector('figure.article-thumb img')
-                ?.attributes['src'];
+        article
+            .querySelector('figure.article-thumb img')
+            ?.attributes['src'];
 
-        // Published date (optional)
         DateTime publishedAt = DateTime.now();
         final datetimeAttr =
-            article.querySelector('time')?.attributes['datetime'];
+        article.querySelector('time')?.attributes['datetime'];
 
         if (datetimeAttr != null) {
           publishedAt = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
@@ -285,7 +303,6 @@ class CrawlerService {
 
     for (final item in items) {
       try {
-        // Title + link
         final titleElement = item.querySelector('h2.article-title');
         final title = titleElement?.text.trim() ?? '';
 
@@ -293,7 +310,6 @@ class CrawlerService {
 
         if (title.isEmpty || link == null) continue;
 
-        // Image (handle lazy-loading)
         final img = item.querySelector('picture img');
         final imageUrl = img?.attributes['src'] ?? img?.attributes['data-src'];
 
@@ -333,10 +349,9 @@ class CrawlerService {
         String description =
             element.querySelector('.article__excerpt')?.text.trim() ?? '';
 
-        // Parse date
         DateTime publishedAt = DateTime.now();
         var dateText =
-            element.querySelector('p.article__meta-data')?.text.trim();
+        element.querySelector('p.article__meta-data')?.text.trim();
         if (dateText != null) {
           try {
             var dateMatch = RegExp(
@@ -350,11 +365,10 @@ class CrawlerService {
           } catch (_) {}
         }
 
-        // Media
         String? mediaUrl;
         var img =
             element.querySelector('.slider__slide-inner img') ??
-            element.querySelector('.article__thumbnail');
+                element.querySelector('.article__thumbnail');
         var iframe = element.querySelector('.slider__slide-inner iframe');
         if (img != null) {
           mediaUrl = img.attributes['src'];
@@ -383,47 +397,40 @@ class CrawlerService {
   List<Article> parseRomaniaTV(Document document) {
     final List<Article> articles = [];
 
-    // Each article block
     final articleBlocks = document.querySelectorAll('.article');
 
     for (var item in articleBlocks) {
       try {
-        // ----- TITLE & URL -----
         var titleAnchor =
             item.querySelector('h2 a') ??
-            item.querySelector('.article__title a') ??
-            item.querySelector('a');
+                item.querySelector('.article__title a') ??
+                item.querySelector('a');
         if (titleAnchor == null) continue;
 
         final title = titleAnchor.text.trim();
         final url = titleAnchor.attributes['href'] ?? '';
         if (url.isEmpty) continue;
 
-        // ----- DESCRIPTION / EXCERPT -----
         final description =
             item.querySelector('.article__excerpt')?.text.trim() ??
-            item.querySelector('p')?.text.trim() ??
-            '';
+                item.querySelector('p')?.text.trim() ??
+                '';
 
-        // ----- IMAGE -----
         String? imageUrl;
         final imgTag = item.querySelector('img');
         if (imgTag != null) {
           imageUrl = imgTag.attributes['src'] ?? imgTag.attributes['data-src'];
         }
 
-        // ----- CATEGORY -----
         final category =
-            item.querySelector('.cat, .label, .label--red')?.text.trim();
+        item.querySelector('.cat, .label, .label--red')?.text.trim();
 
-        // ----- TIME / PUBLISHED AT -----
         final timeText =
             item.querySelector('time')?.text.trim() ??
-            item.querySelector('.article__meta-data')?.text.trim() ??
-            '';
+                item.querySelector('.article__meta-data')?.text.trim() ??
+                '';
         DateTime publishedAt = DateTime.now();
         if (timeText.isNotEmpty) {
-          // Try parsing "13 ianuarie 2026, 21:11"
           final match = RegExp(
             r'(\d{1,2})\s+([^\s]+)\s+(\d{4}),\s*(\d{2}:\d{2})',
           ).firstMatch(timeText);
@@ -459,7 +466,6 @@ class CrawlerService {
           }
         }
 
-        // ----- CREATE ARTICLE OBJECT -----
         articles.add(
           Article(
             title: title,
@@ -481,12 +487,10 @@ class CrawlerService {
   List<Article> parseAntena3(Document document) {
     final List<Article> articles = [];
 
-    // Select all article blocks
     final articleBlocks = document.querySelectorAll('article');
 
     for (var item in articleBlocks) {
       try {
-        // ----- TITLE & URL -----
         final titleAnchor = item.querySelector('h3 a');
         if (titleAnchor == null) continue;
 
@@ -494,26 +498,20 @@ class CrawlerService {
         final url = titleAnchor.attributes['href'] ?? '';
         if (url.isEmpty) continue;
 
-        // ----- DESCRIPTION / EXCERPT -----
         final description =
             item.querySelector('.abs, .abs-extern')?.text.trim() ?? '';
 
-        // ----- IMAGE -----
         String? imageUrl;
         final imgTag = item.querySelector('.thumb img');
         if (imgTag != null) {
           imageUrl = imgTag.attributes['data-src'] ?? imgTag.attributes['src'];
         }
 
-        // ----- CATEGORY -----
-        // Antena3 doesn't always have a category in the HTML, so we leave it nullable
         String? category;
 
-        // ----- TIME / PUBLISHED AT -----
         final timeText = item.querySelector('.date')?.text.trim() ?? '';
         DateTime publishedAt = DateTime.now();
         if (timeText.isNotEmpty) {
-          // Example: "Publicat acum 23 minute"
           final match = RegExp(
             r'Publicat\s+acum\s+(\d+)\s+minute?',
           ).firstMatch(timeText);
@@ -525,7 +523,6 @@ class CrawlerService {
           }
         }
 
-        // ----- CREATE ARTICLE OBJECT -----
         articles.add(
           Article(
             title: title,
@@ -544,7 +541,6 @@ class CrawlerService {
     return articles;
   }
 
-  /// Helper to parse Romanian date format, e.g. "13 ianuarie 2026 21:11"
   DateTime parseTVRDate(String dateStr) {
     Map<String, int> months = {
       'ianuarie': 1,

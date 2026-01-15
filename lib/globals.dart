@@ -489,7 +489,8 @@ class Globals {
       // Exclude sports politics
       'scandal la federatie', 'alegeri federatie',
       // Exclude unrelated words that might appear in articles
-      'autostraz', 'utilaj', 'autostrada', 'transport', 'securitate',
+      'autostraz', 'utilaj', 'autostrada', 'transport', 'securitate', 'militar',
+      'nato',
     ],
     'Vreme': [
       // Exclude climate change politics/policy

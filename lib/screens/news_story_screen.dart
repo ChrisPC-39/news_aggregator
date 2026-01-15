@@ -44,7 +44,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       if (!_showSearchBar) {
         setState(() => _showSearchBar = true);
       }
-    } else if (currentScrollOffset > _lastScrollOffset && currentScrollOffset > 50) {
+    } else if (currentScrollOffset > _lastScrollOffset && currentScrollOffset > 100) {
       // Scrolling down (and past 50 pixels to avoid hiding at top)
       if (_showSearchBar) {
         setState(() => _showSearchBar = false);
@@ -248,63 +248,6 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                       });
                     },
                   ),
-                  // Floating Search Bar at Bottom
-                  // Positioned(
-                  //   left: 0,
-                  //   right: 0,
-                  //   bottom: 0,
-                  //   child: AnimatedSlide(
-                  //     duration: const Duration(milliseconds: 200),
-                  //     curve: Curves.easeInOut,
-                  //     offset: _showSearchBar ? Offset.zero : const Offset(0, 1),
-                  //     child: Container(
-                  //       padding: const EdgeInsets.all(12),
-                  //       decoration: BoxDecoration(
-                  //         color: Colors.transparent,
-                  //         boxShadow: [
-                  //           BoxShadow(
-                  //             color: Colors.black.withOpacity(0.15),
-                  //             blurRadius: 8,
-                  //             offset: const Offset(0, -2),
-                  //           ),
-                  //         ],
-                  //       ),
-                  //       child: TextField(
-                  //         controller: _searchController,
-                  //         focusNode: _searchFocusNode,
-                  //         decoration: InputDecoration(
-                  //           hintText: 'Search stories...',
-                  //           prefixIcon: const Icon(Icons.search),
-                  //           suffixIcon: _searchQuery.isNotEmpty
-                  //               ? IconButton(
-                  //             icon: const Icon(Icons.clear),
-                  //             onPressed: () {
-                  //               setState(() {
-                  //                 _searchController.clear();
-                  //                 _searchQuery = '';
-                  //               });
-                  //             },
-                  //           )
-                  //               : null,
-                  //           filled: true,
-                  //           border: OutlineInputBorder(
-                  //             borderRadius: BorderRadius.circular(12),
-                  //             borderSide: BorderSide.none,
-                  //           ),
-                  //           contentPadding: const EdgeInsets.symmetric(
-                  //             horizontal: 16,
-                  //             vertical: 12,
-                  //           ),
-                  //         ),
-                  //         onChanged: (value) {
-                  //           setState(() {
-                  //             _searchQuery = value.toLowerCase();
-                  //           });
-                  //         },
-                  //       ),
-                  //     ),
-                  //   ),
-                  // ),
                 ],
               ),
             ),
@@ -360,7 +303,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             // Wrap your image in a Stack
             SizedBox(
               width: double.infinity,
-              height: 200,
+              height: story.imageUrl != null && story.imageUrl!.isNotEmpty ? 200 : 35,
               child: Stack(
                 children: [
                   if (story.imageUrl != null && story.imageUrl!.isNotEmpty)

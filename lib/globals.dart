@@ -2,6 +2,10 @@ class Globals {
   static final leftSources = ["Adevarul", "HotNews", "Libertatea"];
   static final centerSources = ["Digi24", "TVRInfo"];
   static final rightSources = ["RomaniaTV", "Antena3"];
+  static final allSources = [
+    "Adevarul", "HotNews", "Libertatea",
+    "Digi24", "TVRInfo", "RomaniaTV", "Antena3"
+  ];
 
   static String cleanTitle(String raw) {
     return raw
@@ -68,10 +72,10 @@ class Globals {
       'conflict', 'criza', 'refugiat', 'refugiati', 'razboi',
       'summit', 'onu', 'sua', 'china', 'terorism', 'geopolitica',
       'ambasador', 'frontiera', 'granita', 'iran', 'america',
-      'iraq', 'israel', 'gaza', 'syria', 'ungaria', 'suedia', 'orban', 'ucrain'
-
+      'iraq', 'israel', 'gaza', 'syria', 'ungaria', 'suedia', 'orban', 'ucrain',
+      'reinarmare'
       // Multi-word phrases - international focus
-      'uniunea europeana', 'uniune europeana', 'statele unite',
+      'uniunea europeana', 'uniune europeana', 'statele unite', 'putere',
       'statele unite ale americii', 'casa alba', 'presedintele sua',
       'presedintele rusiei', 'vladimir putin', 'razboi in ucraina',
       'conflict armat', 'conflict militar', 'invazie rusa',
@@ -117,7 +121,7 @@ class Globals {
       'japonia', 'india', 'pakistan', 'afganistan', 'turcia',
       'arabia saudita', 'emiratele arabe', 'egipt', 'libia',
       'conflict regional', 'conflict international', 'razboi global',
-      'comunitate internationala', 'ordine mondiala', 'securitate globala'
+      'comunitate internationala', 'ordine mondiala', 'securitate globala',
     ],
 
     'Business': [
@@ -125,7 +129,8 @@ class Globals {
       'economie', 'taxe', 'impozit', 'salarii', 'bursa', 'inflatie',
       'finante', 'investitii', 'profit', 'piata', 'tranzactii', 'afaceri',
       'startup', 'antreprenor', 'venit', 'pib', 'buget', 'actiuni',
-      'banca', 'credit', 'dobanda', 'imobiliare', 'energie',
+      'banca', 'credit', 'dobanda', 'imobiliare', 'energie', 'autostraz',
+      'autostrada',
       // Multi-word phrases
       'bursa de valori', 'bursa de la bucuresti', 'piata de capital',
       'piata imobiliara', 'piata financiara', 'piata energiei',
@@ -156,6 +161,7 @@ class Globals {
       'festival', 'concert', 'divertisment', 'artist', 'premiera',
       'eveniment', 'cinema', 'netflix', 'hollywood', 'oscar', 'grammy',
       'lifestyle', 'monden', 'influencer', 'vlogger', 'spectacol', 'cultura',
+      'emisiune',
       // Multi-word phrases
       'premiera filmului', 'premiera mondiala', 'lansare film',
       'film romanesc', 'film hollywoodian', 'film de oscar',
@@ -241,7 +247,7 @@ class Globals {
       // Single words
       'sanatate', 'spital', 'medic', 'covid', 'vaccin', 'boala', 'tratament',
       'simptome', 'carantina', 'doctor', 'clinica', 'pacient', 'farmacie',
-      'medicament', 'epidemie', 'pandemie', 'dieta', 'nutritie',
+      'medicament', 'epidemie', 'pandemie', 'dieta', 'nutritie', 'microplastic',
       // Multi-word phrases
       'sistem sanitar', 'sistem medical', 'minister sanatatii',
       'ministrul sanatatii', 'spital de urgenta', 'spital clinic',
@@ -291,8 +297,8 @@ class Globals {
     'Sport': [
       // Single words
       'fotbal', 'sport', 'tenis', 'baschet', 'handbal', 'competitie',
-      'campionat', 'olimpiada', 'echipa', 'meci', 'scor', 'gol', 'transfer',
-      'antrenor', 'liga', 'ucl', 'halep', 'stelist', 'dinamovist', 'rapidist',
+      'campionat', 'olimpiada', 'echipa', 'meci', 'scor', 'gol',
+      'antrenor', 'liga', 'halep', 'stelist', 'dinamovist', 'rapidist',
       // Multi-word phrases
       'echipa nationala', 'nationala romaniei', 'nationala de fotbal',
       'tricolorii', 'selectionerul nationalei', 'antrenor national',
@@ -360,8 +366,8 @@ class Globals {
     'Vreme': [
       // Single words
       'vreme', 'furtuna', 'ninsori', 'zapada', 'zapada abundenta', 'canicula',
-      'cod galben', 'ploaie', 'temperaturi', 'meteo', 'prognoza', 'anm',
-      'grindina', 'vant', 'inghet',
+      'cod galben', 'ploaie', 'temperaturi', 'meteo', 'prognoza',
+      'grindina', 'vant', 'inghet', 'viscol',
       // Multi-word phrases
       'prognoza meteo', 'prognoza vremii', 'serviciul meteo',
       'administrația națională de meteorologie', 'centru meteorologic',
@@ -398,7 +404,7 @@ class Globals {
       'furtuna puternica', 'furtuna electrica', 'furtuni violente',
       'descarcari electrice', 'fulgere', 'intensificari ale vantului',
       'vant puternic', 'rafale de vant', 'vant cu rafale',
-      'viteza vantului', 'vijelie', 'rafale peste', 'km/h',
+      'viteza vantului', 'vijelie', 'rafale peste',
       'grindina de mari dimensiuni', 'caderi de grindina',
       'grindina puternica', 'fenomene meteo extreme',
       'fenomene periculoase', 'vreme severa', 'vreme extrema',
@@ -415,11 +421,7 @@ class Globals {
       'zona montana', 'zona de munte', 'peste 1800 metrii',
       'la munte', 'la altitudini', 'regiuni montane', 'carpatii',
       'zona de câmpie', 'zona de deal', 'regiuni de câmpie',
-      'vest tarii', 'est tarii', 'nord tarii', 'sud tarii',
-      'transilvania', 'moldova', 'muntenia', 'dobrogea',
-      'banat', 'oltenia', 'bucuresti si ilfov', 'litoral',
-      'zona litoralului', 'marea neagra', 'raurile mari',
-      'raul dunarea', 'prut', 'siret', 'olt', 'mures'
+      'vest tarii', 'est tarii', 'nord tarii', 'sud tarii'
     ],
   };
 
@@ -486,6 +488,8 @@ class Globals {
       'casa de pariuri', 'pariuri sportive', 'cota meci',
       // Exclude sports politics
       'scandal la federatie', 'alegeri federatie',
+      // Exclude unrelated words that might appear in articles
+      'autostraz', 'utilaj', 'autostrada', 'transport',
     ],
     'Vreme': [
       // Exclude climate change politics/policy

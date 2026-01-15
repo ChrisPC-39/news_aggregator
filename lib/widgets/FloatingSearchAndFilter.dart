@@ -67,29 +67,6 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header with close button
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Filters',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () {
-                                setState(() => isFiltersExpanded = false);
-                              },
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 12),
-
                         // Category label
                         Text(
                           'Categories',
@@ -145,12 +122,9 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                                 padding: const EdgeInsets.only(right: 8.0),
                                 child: ChoiceChip(
                                   label: Text('$value+ sources'),
+                                  shape: StadiumBorder(),
                                   selected: isSelected,
-                                  // selectedColor: Theme.of(context).primaryColor,
                                   backgroundColor: Colors.grey.withValues(alpha: 0.3),
-                                  // labelStyle: TextStyle(
-                                  //   color: isSelected ? Colors.white : Colors.black87,
-                                  // ),
                                   onSelected: (_) {
                                     widget.onMinimumSourcesChanged(value);
                                   },
@@ -194,7 +168,6 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                     )
                         : null,
                     filled: true,
-                    // fillColor: Colors.grey[100],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,

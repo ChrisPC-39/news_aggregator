@@ -7,14 +7,18 @@ import 'package:news_aggregator/services/score_service.dart';
 import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
+import 'firebase_article_repository.dart';
 
 class CrawlerService {
-  Future<List<NewsStory>> fetchGroupedStories() async {
-    ScoreService scoreService = ScoreService();
+  Stream<List<NewsStory>> watchGroupedStories() {
+    final repo = FirebaseArticleRepository();
+    final scoreService = ScoreService();
 
-    final articles = await fetchAllSources();
-    final unique = removeDuplicateArticles(articles);
-    return scoreService.groupArticles(unique);
+    return repo.watchArticles().map((articles) {
+      final unique = removeDuplicateArticles(articles);
+      final grouped = scoreService.groupArticles(unique);
+      return grouped;
+    });
   }
 
   List<Article> removeDuplicateArticles(List<Article> articles) {
@@ -32,16 +36,17 @@ class CrawlerService {
     return uniqueArticles;
   }
 
-  Future<List<Article>> fetchAllSources() async {
+  Future<void> fetchAllSources() async {
     List<Article> allArticles = [];
+
     for (var url in Globals.urls) {
-      var siteArticles = await crawlSite(url);
+      final siteArticles = await crawlSite(url);
       allArticles.addAll(siteArticles);
     }
 
-    // Sort by "newest" (since we don't have real dates from some scrapers, we just keep order)
-    return allArticles;
+    await FirebaseArticleRepository().syncArticles(allArticles);
   }
+
 
   Future<List<Article>> crawlSite(String url) async {
     try {
@@ -96,7 +101,6 @@ class CrawlerService {
 
   List<Article> parseAdevarul(Document document) {
     List<Article> articles = [];
-
     final containers = document.querySelectorAll('div.container');
 
     for (var container in containers) {

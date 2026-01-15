@@ -33,7 +33,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     super.initState();
     // _crawlerService.fetchAllSources();
     _scrollController.addListener(_onScroll);
-    _storiesStream = _crawlerService.watchGroupedStories();
+    _storiesStream = _crawlerService.watchGroupedStories().asBroadcastStream();
   }
 
   void _onScroll() {
@@ -132,22 +132,24 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                   );
                 }
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(
-                    top: 8,
-                    bottom: 80,
-                    left: 8,
-                    right: 8,
-                  ),
-                  itemCount: stories.length,
-                  itemBuilder: (context, index) {
-                    final story = stories[index];
-                    final sources =
-                        story.articles.map((a) => a.sourceName).toList();
+                return Positioned.fill(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.only(
+                      top: 8,
+                      bottom: 80,
+                      left: 8,
+                      right: 8,
+                    ),
+                    itemCount: stories.length,
+                    itemBuilder: (context, index) {
+                      final story = stories[index];
+                      final sources =
+                          story.articles.map((a) => a.sourceName).toList();
 
-                    return buildNewsStoryCard(context, story, sources);
-                  },
+                      return buildNewsStoryCard(context, story, sources);
+                    },
+                  ),
                 );
               },
             ),
@@ -190,11 +192,13 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   // 🔎 Centralized filtering logic
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
-      if (selectedCategories.isNotEmpty &&
-          (story.storyTypes == null ||
-              story.storyTypes!.isEmpty ||
-              !story.storyTypes!.any((type) => selectedCategories.contains(type)))) {
-        return false;
+      if (selectedCategories.isNotEmpty) {
+        if (story.storyTypes == null || story.storyTypes!.isEmpty) return false;
+
+        // Require ALL selected categories to be present
+        if (!selectedCategories.every((cat) => story.storyTypes!.contains(cat))) {
+          return false;
+        }
       }
 
       final uniqueSources =

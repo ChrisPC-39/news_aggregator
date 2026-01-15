@@ -190,4 +190,27 @@ class ScoreService {
 
     return stories;
   }
+
+  List<NewsStory> groupArticlesIncremental(List<NewsStory> existing, List<Article> newArticles) {
+    // 1️⃣ Convert existing canonicalTitles to a set
+    final existingTitles = existing.map((s) => s.canonicalTitle).toSet();
+
+    // 2️⃣ Group only new articles
+    final newStories = groupArticles(newArticles); // reuse your normal grouping
+
+    // 3️⃣ Merge
+    final merged = [...existing];
+
+    for (var story in newStories) {
+      if (!existingTitles.contains(story.canonicalTitle)) {
+        merged.add(story);
+      } else {
+        // Optional: merge new articles into existing story
+        final idx = merged.indexWhere((s) => s.canonicalTitle == story.canonicalTitle);
+        merged[idx].articles.addAll(story.articles);
+      }
+    }
+
+    return merged;
+  }
 }

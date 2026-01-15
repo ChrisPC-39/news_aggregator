@@ -1,9 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/adapters.dart';
 import 'package:news_aggregator/screens/news_story_screen.dart';
 
 import 'firebase_options.dart';
+import 'models/hive_models.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +18,12 @@ Future<void> main() async {
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
   );
+
+  await Hive.initFlutter();
+  Hive.registerAdapter(ArticleHiveAdapter());
+  Hive.registerAdapter(NewsStoryHiveAdapter());
+
+  await Hive.openBox<NewsStoryHive>('groupedStories');
 
   runApp(const MyApp());
 }

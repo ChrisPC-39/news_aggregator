@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -8,17 +9,50 @@ import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
 import 'firebase_article_repository.dart';
+import 'grouped_stories_cache_service.dart';
 
 class CrawlerService {
-  Stream<List<NewsStory>> watchGroupedStories() {
-    final repo = FirebaseArticleRepository();
-    final scoreService = ScoreService();
+  final repo = FirebaseArticleRepository();
+  final scoreService = ScoreService();
+  final GroupedStoriesCacheService cache = GroupedStoriesCacheService();
 
-    return repo.watchArticles().map((articles) {
+  /// Watch Firestore and return cached + updated grouped stories
+  Stream<List<NewsStory>> watchGroupedStories() {
+    // 1️⃣ Load initial cached stories
+    final initialStories = cache.load();
+
+    // 2️⃣ StreamController with initial data
+    final controller = StreamController<List<NewsStory>>();
+    controller.add(initialStories);
+
+    // 3️⃣ Listen to Firestore in background
+    repo.watchArticles().listen((articles) async {
       final unique = removeDuplicateArticles(articles);
-      final grouped = scoreService.groupArticles(unique);
-      return grouped;
+
+      // Incremental grouping
+      final grouped = scoreService.groupArticlesIncremental(
+        initialStories,
+        unique,
+      );
+
+      for (var story in grouped) {
+        final seen = <String>{};
+        story.articles.retainWhere((article) {
+          final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+          if (seen.contains(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      // Update Hive cache
+      await cache.save(grouped);
+
+      // Emit updated stream
+      controller.add(grouped);
     });
+
+    return controller.stream;
   }
 
   List<Article> removeDuplicateArticles(List<Article> articles) {
@@ -26,7 +60,8 @@ class CrawlerService {
     final uniqueArticles = <Article>[];
 
     for (var article in articles) {
-      final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+      final key =
+          '${article.sourceName}::${article.title.trim().toLowerCase()}';
       if (!seen.contains(key)) {
         seen.add(key);
         uniqueArticles.add(article);
@@ -38,15 +73,12 @@ class CrawlerService {
 
   Future<void> fetchAllSources() async {
     List<Article> allArticles = [];
-
     for (var url in Globals.urls) {
       final siteArticles = await crawlSite(url);
       allArticles.addAll(siteArticles);
     }
-
-    await FirebaseArticleRepository().syncArticles(allArticles);
+    await repo.syncArticles(allArticles);
   }
-
 
   Future<List<Article>> crawlSite(String url) async {
     try {

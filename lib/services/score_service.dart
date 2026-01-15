@@ -32,30 +32,6 @@ class ScoreService {
     return null;
   }
 
-  Set<String> keywords(String text) {
-    final stopWords = {
-      'si',
-      'sau',
-      'din',
-      'la',
-      'cu',
-      'pe',
-      'pentru',
-      'care',
-      'este',
-      'un',
-      'o',
-      'a',
-      'in',
-      'al',
-      'ale',
-    };
-
-    return normalize(
-      text,
-    ).split(' ').where((w) => w.length > 3 && !stopWords.contains(w)).toSet();
-  }
-
   double similarityScore(Article a, Article b) {
     final titleTitle = tokenOverlap(a.title, b.title);
     final titleDesc = tokenOverlap(a.title, b.description);
@@ -70,7 +46,7 @@ class ScoreService {
     return score;
   }
 
-  String inferStoryType(NewsStory story) {
+  List<String> inferStoryTypes(NewsStory story) {
     // Combine all relevant text (already lowercased)
     final text = [
       story.canonicalTitle.toLowerCase(),
@@ -99,8 +75,8 @@ class ScoreService {
       }
     });
 
-    String? bestType;
-    int bestScore = 0;
+    // Map to store category scores
+    final Map<String, int> categoryScores = {};
 
     for (final entry in Globals.storyTypeKeywords.entries) {
       final categoryName = entry.key;
@@ -137,15 +113,27 @@ class ScoreService {
 
       final score = matchedKeywords.length;
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestType = entry.key;
+      if (score > 0) {
+        categoryScores[categoryName] = score;
       }
     }
 
-    // Adaptive threshold based on content length
+    // Adaptive threshold
     final threshold = 1;
-    return bestScore >= threshold ? bestType! : 'General';
+
+    // Get all categories that meet the threshold, sorted by score
+    final matchingTypes =
+        categoryScores.entries
+            .where((entry) => entry.value >= threshold)
+            .toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+
+    // Return the category names, or ['General'] if none match
+    if (matchingTypes.isEmpty) {
+      return ['General'];
+    }
+
+    return matchingTypes.map((e) => e.key).toList();
   }
 
   List<NewsStory> groupArticles(List<Article> articles) {
@@ -177,17 +165,16 @@ class ScoreService {
         stories.add(
           NewsStory(
             canonicalTitle: article.title,
-            summary: article.description ?? '',
-            // fallback to empty
+            summary: article.description,
             articles: [article],
-            storyType: null,
+            storyTypes: null,
             imageUrl: article.urlToImage,
           ),
         );
       }
     }
 
-    // After grouping, update summary and infer story type for each story
+    // After grouping, update summary and infer story types for each story
     for (final story in stories) {
       // Pick first non-empty description among all grouped articles
       story.summary =
@@ -196,10 +183,9 @@ class ScoreService {
                 (a) => a.description.isNotEmpty,
                 orElse: () => story.articles.first,
               )
-              .description ??
-          '';
+              .description;
 
-      story.storyType = inferStoryType(story);
+      story.storyTypes = inferStoryTypes(story);
     }
 
     return stories;

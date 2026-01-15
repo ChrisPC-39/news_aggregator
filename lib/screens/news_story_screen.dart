@@ -24,7 +24,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   final CrawlerService _crawlerService = CrawlerService();
 
   Set<String> selectedCategories = {};
-  int minimumSources = 0;
+  int minimumSources = 2;
 
   late Stream<List<NewsStory>> _storiesStream;
 
@@ -87,52 +87,52 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             ),
           ],
         ),
-        body: StreamBuilder<List<NewsStory>>(
-          stream: _storiesStream,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  'Error: ${snapshot.error}',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              );
-            }
+        body: Stack(
+          children: [
+            StreamBuilder<List<NewsStory>>(
+              stream: _storiesStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  );
+                }
 
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-            final stories = _applyAllFilters(snapshot.data!);
+                final stories = _applyAllFilters(snapshot.data!);
 
-            if (stories.isEmpty) {
-              return Center(
-                child:
-                    _searchQuery.isNotEmpty
-                        ? Text('No stories match "$_searchQuery"')
-                        : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('No news found.'),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                  selectedCategories.clear();
-                                  minimumSources = 1;
-                                });
-                              },
-                              child: const Text('Clear filters'),
+                if (stories.isEmpty) {
+                  return Center(
+                    child:
+                        _searchQuery.isNotEmpty
+                            ? Text('No stories match "$_searchQuery"')
+                            : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('No news found.'),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                      selectedCategories.clear();
+                                      minimumSources = 1;
+                                    });
+                                  },
+                                  child: const Text('Clear filters'),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-              );
-            }
+                  );
+                }
 
-            return Stack(
-              children: [
-                ListView.builder(
+                return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.only(
                     top: 8,
@@ -148,38 +148,40 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
 
                     return buildNewsStoryCard(context, story, sources);
                   },
-                ),
-
-                FloatingSearchAndFilter(
-                  selectedCategories: selectedCategories,
-                  minimumSources: minimumSources,
-                  showSearchBar: _showSearchBar,
-                  searchController: _searchController,
-                  searchQuery: _searchQuery,
-                  searchFocusNode: _searchFocusNode,
-                  onSearchChanged: (value) {
-                    setState(() => _searchQuery = value.toLowerCase());
-                  },
-                  onClearSearch: () {
-                    setState(() {
-                      _searchController.clear();
-                      _searchQuery = '';
-                    });
-                  },
-                  onCategoryToggled: (category, selected) {
-                    setState(() {
-                      selected
-                          ? selectedCategories.add(category)
-                          : selectedCategories.remove(category);
-                    });
-                  },
-                  onMinimumSourcesChanged: (value) {
-                    setState(() => minimumSources = value);
-                  },
-                ),
-              ],
-            );
-          },
+                );
+              },
+            ),
+            FloatingSearchAndFilter(
+              selectedCategories: selectedCategories,
+              minimumSources: minimumSources,
+              showSearchBar: _showSearchBar,
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              searchFocusNode: _searchFocusNode,
+              onSearchChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                  _showSearchBar = true;
+                });
+              },
+              onClearSearch: () {
+                setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                });
+              },
+              onCategoryToggled: (category, selected) {
+                setState(() {
+                  selected
+                      ? selectedCategories.add(category)
+                      : selectedCategories.remove(category);
+                });
+              },
+              onMinimumSourcesChanged: (value) {
+                setState(() => minimumSources = value);
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -189,8 +191,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
       if (selectedCategories.isNotEmpty &&
-          (story.storyType == null ||
-              !selectedCategories.contains(story.storyType))) {
+          (story.storyTypes == null ||
+              story.storyTypes!.isEmpty ||
+              !story.storyTypes!.any((type) => selectedCategories.contains(type)))) {
         return false;
       }
 
@@ -271,28 +274,34 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                       errorBuilder: (_, __, ___) => const SizedBox(),
                     ),
                   // The Tag Overlay
-                  if (story.storyType != null)
+                  if (story.storyTypes != null && story.storyTypes!.isNotEmpty)
                     Positioned(
                       top: 12,
                       left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          story.storyType!.toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: story.storyTypes!.map((type) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              type.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ),
                 ],

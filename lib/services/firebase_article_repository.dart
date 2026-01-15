@@ -90,6 +90,7 @@ class FirebaseArticleRepository {
           urlToImage: data['imageUrl'],
           sourceName: data['source'],
           publishedAt: DateTime.parse(data['publishedAt']),
+          aiSummary: "",
         );
       }).toList();
     });

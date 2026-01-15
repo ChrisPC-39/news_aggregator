@@ -7,6 +7,7 @@ class Article {
   final DateTime publishedAt;
   final String? content;
   final String sourceName;
+  final String? aiSummary;
 
   Article({
     this.author,
@@ -17,6 +18,7 @@ class Article {
     required this.publishedAt,
     this.content,
     required this.sourceName,
+    this.aiSummary,
   });
 
   // Factory constructor to create an Article from a JSON object
@@ -30,6 +32,7 @@ class Article {
       publishedAt: DateTime.tryParse(json['publishedAt'] as String? ?? '') ?? DateTime.now(),
       content: json['content'] as String?,
       sourceName: (json['source'] as Map<String, dynamic>?)?['name'] as String? ?? 'Unknown Source',
+      aiSummary: json['aiSummary'] as String?,
     );
   }
 }

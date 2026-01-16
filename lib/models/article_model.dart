@@ -21,17 +21,30 @@ class Article {
     this.aiSummary,
   });
 
-  // Factory constructor to create an Article from a JSON object
+  Map<String, dynamic> toJson() {
+    return {
+      // 'author': author,
+      'title': title,
+      'description': description,
+      // 'content': content,
+      'url': url,
+      'urlToImage': urlToImage,
+      'publishedAt': publishedAt.toIso8601String(),
+      'sourceName': sourceName,
+      'aiSummary': aiSummary
+    };
+  }
+
   factory Article.fromJson(Map<String, dynamic> json) {
     return Article(
       author: json['author'] as String?,
-      title: json['title'] as String? ?? 'No Title',
-      description: json['description'] as String? ?? 'No Description',
-      url: json['url'] as String? ?? '',
-      urlToImage: json['urlToImage'] as String?,
-      publishedAt: DateTime.tryParse(json['publishedAt'] as String? ?? '') ?? DateTime.now(),
+      title: json['title'] as String,
+      description: json['description'] as String? ?? '',
       content: json['content'] as String?,
-      sourceName: (json['source'] as Map<String, dynamic>?)?['name'] as String? ?? 'Unknown Source',
+      url: json['url'] as String,
+      urlToImage: json['urlToImage'] as String?,
+      publishedAt: DateTime.parse(json['publishedAt'] as String),
+      sourceName: json['sourceName'] as String,
       aiSummary: json['aiSummary'] as String?,
     );
   }

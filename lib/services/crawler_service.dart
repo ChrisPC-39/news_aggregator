@@ -51,12 +51,14 @@ class CrawlerService {
       // Notify that processing has started
       _processingController.add(true);
 
-      final unique = removeDuplicateArticles(articles);
+      // Note: No need to call removeDuplicateArticles here
+      // The repository already handles deduplication across all batches
 
       // ✅ Run heavy computation in background isolate
+      // Pass EMPTY list as initialStories to avoid duplicating cached data
       final grouped = await compute(
         _groupArticlesInIsolate,
-        _GroupingParams(initialStories, unique),
+        _GroupingParams([], articles), // Changed from initialStories to []
       );
 
       // Deduplicate articles within each story
@@ -85,28 +87,20 @@ class CrawlerService {
     return controller.stream;
   }
 
-  List<Article> removeDuplicateArticles(List<Article> articles) {
-    final seen = <String>{};
-    final uniqueArticles = <Article>[];
-
-    for (var article in articles) {
-      final key =
-          '${article.sourceName}::${article.title.trim().toLowerCase()}';
-      if (!seen.contains(key)) {
-        seen.add(key);
-        uniqueArticles.add(article);
-      }
-    }
-
-    return uniqueArticles;
-  }
-
+  /// Fetch all sources and sync to Firestore
+  /// The repository handles deduplication and batch management
   Future<void> fetchAllSources() async {
     List<Article> allArticles = [];
     for (var url in Globals.urls) {
       final siteArticles = await crawlSite(url);
       allArticles.addAll(siteArticles);
     }
+
+    // Repository will handle:
+    // - Checking for duplicates across all batches
+    // - Updating existing articles if content changed
+    // - Adding new articles to batch_0
+    // - Rotating batches if needed
     await repo.syncArticles(allArticles);
   }
 
@@ -153,10 +147,29 @@ class CrawlerService {
           articles = [];
       }
 
-      return removeDuplicateArticles(articles);
+      // Remove duplicates within this crawl only
+      // Cross-batch deduplication is handled by the repository
+      return _removeDuplicatesInList(articles);
     } catch (e) {
       return [];
     }
+  }
+
+  /// Helper to remove duplicates within a single list
+  /// (Not across batches - that's handled by the repository)
+  List<Article> _removeDuplicatesInList(List<Article> articles) {
+    final seen = <String>{};
+    final uniqueArticles = <Article>[];
+
+    for (var article in articles) {
+      final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+      if (!seen.contains(key)) {
+        seen.add(key);
+        uniqueArticles.add(article);
+      }
+    }
+
+    return uniqueArticles;
   }
 
   List<Article> parseAdevarul(Document document) {
@@ -199,7 +212,6 @@ class CrawlerService {
 
   List<Article> parseHotNews(Document document) {
     final List<Article> articles = [];
-
     final articleNodes = document.querySelectorAll('article.post');
 
     for (final article in articleNodes) {
@@ -246,7 +258,6 @@ class CrawlerService {
 
   List<Article> parseDigi24(Document document) {
     final List<Article> articles = [];
-
     final articleNodes = document.querySelectorAll('article.article');
 
     for (final article in articleNodes) {
@@ -298,14 +309,12 @@ class CrawlerService {
 
   List<Article> parseLibertatea(Document document) {
     final List<Article> articles = [];
-
     final items = document.querySelectorAll('div.news-item');
 
     for (final item in items) {
       try {
         final titleElement = item.querySelector('h2.article-title');
         final title = titleElement?.text.trim() ?? '';
-
         final link = item.querySelector('a.art-link')?.attributes['href'];
 
         if (title.isEmpty || link == null) continue;
@@ -333,7 +342,6 @@ class CrawlerService {
 
   List<Article> parseTvrInfo(Document document) {
     List<Article> articles = [];
-
     var articleElements = document.querySelectorAll('div.article');
 
     for (var element in articleElements) {
@@ -396,7 +404,6 @@ class CrawlerService {
 
   List<Article> parseRomaniaTV(Document document) {
     final List<Article> articles = [];
-
     final articleBlocks = document.querySelectorAll('.article');
 
     for (var item in articleBlocks) {
@@ -421,9 +428,6 @@ class CrawlerService {
         if (imgTag != null) {
           imageUrl = imgTag.attributes['src'] ?? imgTag.attributes['data-src'];
         }
-
-        final category =
-        item.querySelector('.cat, .label, .label--red')?.text.trim();
 
         final timeText =
             item.querySelector('time')?.text.trim() ??
@@ -486,7 +490,6 @@ class CrawlerService {
 
   List<Article> parseAntena3(Document document) {
     final List<Article> articles = [];
-
     final articleBlocks = document.querySelectorAll('article');
 
     for (var item in articleBlocks) {
@@ -506,8 +509,6 @@ class CrawlerService {
         if (imgTag != null) {
           imageUrl = imgTag.attributes['data-src'] ?? imgTag.attributes['src'];
         }
-
-        String? category;
 
         final timeText = item.querySelector('.date')?.text.trim() ?? '';
         DateTime publishedAt = DateTime.now();

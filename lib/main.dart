@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:news_aggregator/screens/news_story_screen.dart';
+import 'package:news_aggregator/services/firebase_article_repository.dart';
 
 import 'firebase_options.dart';
 import 'models/hive_models.dart';
@@ -24,6 +25,7 @@ Future<void> main() async {
   Hive.registerAdapter(NewsStoryHiveAdapter());
 
   await Hive.openBox<NewsStoryHive>('groupedStories');
+  await FirebaseArticleRepository().initialize();
 
   runApp(const MyApp());
 }

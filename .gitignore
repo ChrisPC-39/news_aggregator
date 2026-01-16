@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase related
+/lib/firebase_options.dart
+/firebase.json
+/android/app/google-services.json
+/lib/models/hive_models.g.dart

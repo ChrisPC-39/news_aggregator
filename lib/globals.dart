@@ -161,7 +161,7 @@ class Globals {
       'festival', 'concert', 'divertisment', 'artist', 'premiera',
       'eveniment', 'cinema', 'netflix', 'hollywood', 'oscar', 'grammy',
       'lifestyle', 'monden', 'influencer', 'vlogger', 'spectacol', 'cultura',
-      'emisiune',
+      'emisiune', 'zodii', 'zodie',
       // Multi-word phrases
       'premiera filmului', 'premiera mondiala', 'lansare film',
       'film romanesc', 'film hollywoodian', 'film de oscar',
@@ -489,7 +489,8 @@ class Globals {
       // Exclude sports politics
       'scandal la federatie', 'alegeri federatie',
       // Exclude unrelated words that might appear in articles
-      'autostraz', 'utilaj', 'autostrada', 'transport',
+      'autostraz', 'utilaj', 'autostrada', 'transport', 'securitate', 'militar',
+      'nato',
     ],
     'Vreme': [
       // Exclude climate change politics/policy

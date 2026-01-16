@@ -82,17 +82,16 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: Globals.storyTypeKeywords.keys.map((category) {
-                              final isSelected = widget.selectedCategories.contains(category);
+                              final normalized = category.toLowerCase().trim();
+                              final isSelected = widget.selectedCategories.contains(normalized);
                               return Padding(
                                 padding: const EdgeInsets.only(right: 8.0),
                                 child: FilterChip(
                                   label: Text(category),
                                   selected: isSelected,
                                   backgroundColor: Colors.grey.withValues(alpha: 0.3),
-                                  // selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
-                                  // checkmarkColor: Theme.of(context).primaryColor,
                                   onSelected: (selected) {
-                                    widget.onCategoryToggled(category, selected);
+                                    widget.onCategoryToggled(normalized, selected);
                                   },
                                 ),
                               );

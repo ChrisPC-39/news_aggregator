@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../services/crawler_service.dart';
 import '../widgets/FloatingSearchAndFilter.dart';
@@ -32,6 +31,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   @override
   void initState() {
     super.initState();
+    _crawlerService.fetchAllSources();
     _scrollController.addListener(_onScroll);
     _storiesStream = _crawlerService.watchGroupedStories().asBroadcastStream();
 
@@ -96,14 +96,15 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
           // Add loading indicator at bottom of AppBar
           bottom: PreferredSize(
             preferredSize: Size.fromHeight(_isLoading ? 3 : 0),
-            child: _isLoading
-                ? LinearProgressIndicator(
-              backgroundColor: Colors.white.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Colors.white.withOpacity(0.8),
-              ),
-            )
-                : const SizedBox.shrink(),
+            child:
+                _isLoading
+                    ? LinearProgressIndicator(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white.withOpacity(0.8),
+                      ),
+                    )
+                    : const SizedBox.shrink(),
           ),
         ),
         body: Stack(
@@ -129,29 +130,28 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                 if (stories.isEmpty) {
                   return Center(
                     child:
-                    _searchQuery.isNotEmpty
-                        ? Text('No stories match "$_searchQuery"')
-                        : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('No news found.'),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                              selectedCategories.clear();
-                              minimumSources = 1;
-                            });
-                          },
-                          child: const Text('Clear filters'),
-                        ),
-                      ],
-                    ),
+                        _searchQuery.isNotEmpty
+                            ? Text('No stories match "$_searchQuery"')
+                            : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('No news found.'),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                      selectedCategories.clear();
+                                      minimumSources = 1;
+                                    });
+                                  },
+                                  child: const Text('Clear filters'),
+                                ),
+                              ],
+                            ),
                   );
                 }
 
-                // FIXED: Remove Positioned.fill, return ListView directly
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.only(
@@ -164,7 +164,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                   itemBuilder: (context, index) {
                     final story = stories[index];
                     final sources =
-                    story.articles.map((a) => a.sourceName).toList();
+                        story.articles.map((a) => a.sourceName).toList();
 
                     return buildNewsStoryCard(context, story, sources);
                   },
@@ -191,10 +191,11 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                 });
               },
               onCategoryToggled: (category, selected) {
+                final normalized = category.toLowerCase().trim();
                 setState(() {
                   selected
-                      ? selectedCategories.add(category)
-                      : selectedCategories.remove(category);
+                      ? selectedCategories.add(normalized)
+                      : selectedCategories.remove(normalized);
                 });
               },
               onMinimumSourcesChanged: (value) {
@@ -207,14 +208,19 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     );
   }
 
-  // 🔎 Centralized filtering logic
+  // Centralized filtering logic
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
       if (selectedCategories.isNotEmpty) {
-        if (story.storyTypes == null || story.storyTypes!.isEmpty) return false;
+        // Merge all story types into a single set
+        final allTypes = <String>{
+          ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
+          ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
+        };
 
-        // Require ALL selected categories to be present
-        if (!selectedCategories.every((cat) => story.storyTypes!.contains(cat))) {
+        if (allTypes.isEmpty) return false;
+
+        if (!selectedCategories.every(allTypes.contains)) {
           return false;
         }
       }
@@ -224,12 +230,12 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       if (uniqueSources < minimumSources) return false;
 
       if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery;
+        final q = _searchQuery.trimRight();
         return story.canonicalTitle.toLowerCase().contains(q) ||
             (story.summary?.toLowerCase().contains(q) ?? false) ||
             story.articles.any(
-                  (a) =>
-              a.title.toLowerCase().contains(q) ||
+              (a) =>
+                  a.title.toLowerCase().contains(q) ||
                   a.description.toLowerCase().contains(q),
             );
       }
@@ -239,30 +245,12 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   Widget buildNewsStoryCard(
-      BuildContext context,
-      NewsStory story,
-      List<String> sources,
-      ) {
-    int leftCount =
-        sources.where((s) => Globals.leftSources.contains(s)).length;
-    int centerCount =
-        sources.where((s) => Globals.centerSources.contains(s)).length;
-    int rightCount =
-        sources.where((s) => Globals.rightSources.contains(s)).length;
-
-    // Only include categories with count > 0
-    final counts = {
-      "Left": leftCount,
-      "Center": centerCount,
-      "Right": rightCount,
-    }..removeWhere((_, value) => value == 0);
-
-    final totalCount = counts.values.fold(0, (a, b) => a + b);
-
-    // If totalCount == 0, give dummy flex values to avoid Row collapse
-    final flexLeft = leftCount > 0 ? leftCount : 0;
-    final flexCenter = centerCount > 0 ? centerCount : 0;
-    final flexRight = rightCount > 0 ? rightCount : 0;
+    BuildContext context,
+    NewsStory story,
+    List<String> sources,
+  ) {
+    final manualTypes = story.storyTypes ?? [];
+    final aiTypes = story.inferredStoryTypes ?? [];
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -282,9 +270,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             SizedBox(
               width: double.infinity,
               height:
-              story.imageUrl != null && story.imageUrl!.isNotEmpty
-                  ? 200
-                  : 35,
+                  story.imageUrl != null && story.imageUrl!.isNotEmpty
+                      ? 200
+                      : 35,
               child: Stack(
                 children: [
                   if (story.imageUrl != null && story.imageUrl!.isNotEmpty)
@@ -296,34 +284,21 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                       errorBuilder: (_, __, ___) => const SizedBox(),
                     ),
                   // The Tag Overlay
-                  if (story.storyTypes != null && story.storyTypes!.isNotEmpty)
+                  if (manualTypes.isNotEmpty || aiTypes.isNotEmpty)
                     Positioned(
                       top: 12,
                       left: 12,
                       child: Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: story.storyTypes!.map((type) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              type.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                        children: [
+                          ...manualTypes.map(
+                            (type) => _buildTagChip(type, isAi: false),
+                          ),
+                          ...aiTypes.map(
+                            (type) => _buildTagChip(type, isAi: true),
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -361,36 +336,56 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                     visible: story.summary != null,
                     child: const SizedBox(height: 16),
                   ),
-
-                  // Segmented Bar
-                  SizedBox(
-                    height: 10,
-                    child: Row(
-                      children: [
-                        if (flexLeft > 0)
-                          Expanded(
-                            flex: flexLeft,
-                            child: Container(color: Colors.blue[400]),
-                          ),
-                        if (flexCenter > 0)
-                          Expanded(
-                            flex: flexCenter,
-                            child: Container(color: Colors.grey[400]),
-                          ),
-                        if (flexRight > 0)
-                          Expanded(
-                            flex: flexRight,
-                            child: Container(color: Colors.red[400]),
-                          ),
-                        if (totalCount == 0)
-                          Expanded(
-                            flex: 1,
-                            child: Container(color: Colors.grey.shade300),
-                          ),
-                      ],
-                    ),
-                  ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTagChip(String label, {required bool isAi}) {
+    return ClipRRect( // Clips the blur to the border radius
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          // Use higher opacity and a touch of white for AI to fight dark/busy images
+          color: isAi
+              ? Colors.deepPurple.withValues(alpha: 0.85)
+              : Colors.black.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isAi ? Colors.deepPurple : Colors.white24,
+            width: 1,
+          ),
+          // Optional: Add a subtle outer glow for the AI tag
+          boxShadow: isAi ? [
+            BoxShadow(
+              color: Colors.deepPurple.withValues(alpha: 0.3),
+              blurRadius: 8,
+              spreadRadius: 1,
+            )
+          ] : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isAi)
+              const Icon(
+                Icons.auto_awesome,
+                size: 12,
+                color: Colors.white, // White icon pops better on purple
+              ),
+            if (isAi) const SizedBox(width: 4),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: Colors.white, // Solid white text is the most readable
+                fontSize: 10,
+                fontWeight: FontWeight.w900, // Extra bold for small text
+                letterSpacing: 0.5,
               ),
             ),
           ],

@@ -63,7 +63,8 @@ class Globals {
       'parlament de la bucuresti', 'coalitia psd-pnl', 'coalitia de dreapta',
       'opozitia parlamentara', 'puterea de la bucuresti',
       'institutii romanesti', 'autoritati romane', 'oficiali romani',
-      'liderii politici romani', 'clasa politica romaneasca', 'armatei romane'
+      'liderii politici romani', 'clasa politica romaneasca', 'armatei romane',
+      'la bucuresti'
     ],
 
     'World': [
@@ -453,7 +454,7 @@ class Globals {
       'politica romaneasca', 'scena politica romaneasca',
       'psd', 'pnl', 'usr', 'aur', 'udmr',
       'alegeri locale', 'alegeri parlamentare romanesti',
-      'alegeri prezidentiale romania',
+      'alegeri prezidentiale romania', 'la bucuresti',
       // Keep "romania in nato" and "romania in ue" in World, so don't exclude them
     ],
     'Business': [

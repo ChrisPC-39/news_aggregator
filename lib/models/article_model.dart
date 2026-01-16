@@ -8,6 +8,7 @@ class Article {
   final String? content;
   final String sourceName;
   final String? aiSummary;
+  final String? category;
 
   Article({
     this.author,
@@ -19,6 +20,7 @@ class Article {
     this.content,
     required this.sourceName,
     this.aiSummary,
+    this.category,
   });
 
   Map<String, dynamic> toJson() {
@@ -31,7 +33,8 @@ class Article {
       'urlToImage': urlToImage,
       'publishedAt': publishedAt.toIso8601String(),
       'sourceName': sourceName,
-      'aiSummary': aiSummary
+      'aiSummary': aiSummary,
+      'category': category,
     };
   }
 
@@ -46,6 +49,7 @@ class Article {
       publishedAt: DateTime.parse(json['publishedAt'] as String),
       sourceName: json['sourceName'] as String,
       aiSummary: json['aiSummary'] as String?,
+      category: json['category'] as String?,
     );
   }
 }

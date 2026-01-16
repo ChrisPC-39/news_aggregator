@@ -157,7 +157,22 @@ class FirebaseArticleRepository {
       for (int j = 0; j < articles.length; j++) {
         final key = _generateArticleKey(articles[j]);
         if (articlesToUpdate.containsKey(key)) {
-          articles[j] = articlesToUpdate[key]!;
+          final updatedArticle = articlesToUpdate[key]!;
+
+          // Preserve the original publishedAt date
+          final mergedArticle = Article(
+            author: updatedArticle.author,
+            title: updatedArticle.title,
+            description: updatedArticle.description,
+            url: updatedArticle.url,
+            urlToImage: updatedArticle.urlToImage,
+            publishedAt: articles[j].publishedAt, // Keep original date
+            content: updatedArticle.content,
+            sourceName: articles[j].sourceName, // Keep original source
+            aiSummary: updatedArticle.aiSummary,
+          );
+
+          articles[j] = mergedArticle;
           hasChanges = true;
         }
       }

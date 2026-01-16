@@ -36,6 +36,9 @@ class ArticleHive extends HiveObject {
   @HiveField(8)
   String? aiSummary;
 
+  @HiveField(9)
+  String? category;
+
   ArticleHive({
     this.author,
     required this.title,
@@ -46,6 +49,7 @@ class ArticleHive extends HiveObject {
     this.content,
     required this.sourceName,
     this.aiSummary,
+    this.category,
   });
 
   factory ArticleHive.fromArticle(Article a) => ArticleHive(
@@ -58,6 +62,7 @@ class ArticleHive extends HiveObject {
     content: a.content,
     sourceName: a.sourceName,
     aiSummary: a.aiSummary,
+    category: a.category,
   );
 
   Article toArticle() => Article(
@@ -70,8 +75,10 @@ class ArticleHive extends HiveObject {
     content: content,
     sourceName: sourceName,
     aiSummary: aiSummary,
+    category: category,
   );
 }
+
 
 @HiveType(typeId: 1)
 class NewsStoryHive extends HiveObject {
@@ -90,12 +97,16 @@ class NewsStoryHive extends HiveObject {
   @HiveField(4)
   String? imageUrl;
 
+  @HiveField(5)
+  List<String>? inferredStoryTypes;
+
   NewsStoryHive({
     required this.canonicalTitle,
     required this.articles,
     this.summary,
     this.storyTypes,
     this.imageUrl,
+    this.inferredStoryTypes,
   });
 
   factory NewsStoryHive.fromNewsStory(NewsStory s) => NewsStoryHive(
@@ -104,6 +115,7 @@ class NewsStoryHive extends HiveObject {
     summary: s.summary,
     storyTypes: s.storyTypes,
     imageUrl: s.imageUrl,
+    inferredStoryTypes: s.inferredStoryTypes,
   );
 
   NewsStory toNewsStory() => NewsStory(
@@ -112,5 +124,6 @@ class NewsStoryHive extends HiveObject {
     summary: summary,
     storyTypes: storyTypes,
     imageUrl: imageUrl,
+    inferredStoryTypes: inferredStoryTypes,
   );
 }

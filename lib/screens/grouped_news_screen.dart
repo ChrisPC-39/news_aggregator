@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../globals.dart';
-import '../models/article_model.dart';
 import '../models/news_story_model.dart';
 
 class GroupedNewsScreen extends StatefulWidget {
@@ -82,34 +81,12 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen> {
           const Divider(),
           // 3. Updated Article Mapping
           ...articles.map((article) {
-            final bias = getBiasType(article.sourceName);
-            final color = getBiasColor(bias);
-
             return ListTile(
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
               title: Text(article.title),
               subtitle: Row(
                 children: [
-                  // Bias Indicator Tag
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: color.withOpacity(0.5)),
-                    ),
-                    child: Text(
-                      bias.toUpperCase(),
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  Text(article.publishedAt.toIso8601String()),
                   const SizedBox(width: 8),
                   Text(
                     article.sourceName,

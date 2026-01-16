@@ -9,6 +9,7 @@ import 'package:news_aggregator/services/score_service.dart';
 import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
+import '../parsers/digi24_parser.dart';
 import 'firebase_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
 
@@ -106,6 +107,12 @@ class CrawlerService {
 
   Future<List<Article>> crawlSite(String url) async {
     try {
+      if (url.contains('digi24.ro')) {
+        final digi24Parser = Digi24Parser();
+        final digiArticles = await digi24Parser.parseAllCategories();
+        return _removeDuplicatesInList(digiArticles);
+      }
+
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -122,33 +129,28 @@ class CrawlerService {
       List<Article> articles = [];
 
       switch (domain) {
-        case 'adevarul.ro':
-          articles = parseAdevarul(document);
-          break;
-        case 'hotnews.ro':
-          articles = parseHotNews(document);
-          break;
-        case 'digi24.ro':
-          articles = parseDigi24(document);
-          break;
-        case 'libertatea.ro':
-          articles = parseLibertatea(document);
-          break;
-        case 'tvrinfo.ro':
-          articles = parseTvrInfo(document);
-          break;
-        case 'romaniatv.net':
-          articles = parseRomaniaTV(document);
-          break;
-        case 'antena3.ro':
-          articles = parseAntena3(document);
-          break;
+        // case 'adevarul.ro':
+        //   articles = parseAdevarul(document);
+        //   break;
+        // case 'hotnews.ro':
+        //   articles = parseHotNews(document);
+        //   break;
+        // case 'libertatea.ro':
+        //   articles = parseLibertatea(document);
+        //   break;
+        // case 'tvrinfo.ro':
+        //   articles = parseTvrInfo(document);
+        //   break;
+        // case 'romaniatv.net':
+        //   articles = parseRomaniaTV(document);
+        //   break;
+        // case 'antena3.ro':
+        //   articles = parseAntena3(document);
+        //   break;
         default:
           articles = [];
       }
 
-      // Remove duplicates within this crawl only
-      // Cross-batch deduplication is handled by the repository
       return _removeDuplicatesInList(articles);
     } catch (e) {
       return [];
@@ -246,57 +248,6 @@ class CrawlerService {
             urlToImage: imageUrl,
             publishedAt: publishedAt,
             sourceName: 'HotNews',
-          ),
-        );
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return articles;
-  }
-
-  List<Article> parseDigi24(Document document) {
-    final List<Article> articles = [];
-    final articleNodes = document.querySelectorAll('article.article');
-
-    for (final article in articleNodes) {
-      try {
-        final titleAnchor = article.querySelector('.article-title a');
-        final title = titleAnchor?.text.trim() ?? '';
-        final relativeLink = titleAnchor?.attributes['href'];
-
-        if (title.isEmpty || relativeLink == null) continue;
-
-        final url =
-        relativeLink.startsWith('http')
-            ? relativeLink
-            : 'https://www.digi24.ro$relativeLink';
-
-        final description =
-            article.querySelector('.article-intro')?.text.trim() ?? '';
-
-        final imageUrl =
-        article
-            .querySelector('figure.article-thumb img')
-            ?.attributes['src'];
-
-        DateTime publishedAt = DateTime.now();
-        final datetimeAttr =
-        article.querySelector('time')?.attributes['datetime'];
-
-        if (datetimeAttr != null) {
-          publishedAt = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
-        }
-
-        articles.add(
-          Article(
-            title: title,
-            description: description,
-            url: url,
-            urlToImage: imageUrl,
-            publishedAt: publishedAt,
-            sourceName: 'Digi24',
           ),
         );
       } catch (_) {

@@ -6,6 +6,7 @@ class NewsStory {
   String? summary;
   List<String>? storyTypes;
   String? imageUrl;
+  List<String>? inferredStoryTypes;
 
   NewsStory({
     required this.canonicalTitle,
@@ -13,5 +14,6 @@ class NewsStory {
     this.summary,
     this.storyTypes,
     this.imageUrl,
+    this.inferredStoryTypes,
   });
 }

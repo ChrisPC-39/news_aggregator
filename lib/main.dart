@@ -25,6 +25,8 @@ Future<void> main() async {
   Hive.registerAdapter(NewsStoryHiveAdapter());
 
   await Hive.openBox<NewsStoryHive>('groupedStories');
+
+  // await Hive.box<NewsStoryHive>('groupedStories').clear();
   await FirebaseArticleRepository().initialize();
 
   runApp(const MyApp());

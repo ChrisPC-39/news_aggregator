@@ -9,6 +9,7 @@ class Globals {
   static final allSources = [
     "Adevarul",
     "Digi24",
+    "TVRInfo",
   ];
 
   static String cleanTitle(String raw) {

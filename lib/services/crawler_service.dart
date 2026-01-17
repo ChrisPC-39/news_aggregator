@@ -11,6 +11,7 @@ import '../models/article_model.dart';
 import '../models/news_story_model.dart';
 import '../parsers/adevarul_parser.dart';
 import '../parsers/digi24_parser.dart';
+import '../parsers/tvr_info_parser.dart';
 import 'firebase_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
 
@@ -120,6 +121,12 @@ class CrawlerService {
         return await adevaruParser.parse();
       }
 
+      // Special handling for TvrInfo - use dedicated parser
+      if (url.contains('tvrinfo.ro')) {
+        final tvrinfoParser = TvrInfoParser();
+        return await tvrinfoParser.parse();
+      }
+
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -135,25 +142,22 @@ class CrawlerService {
 
       List<Article> articles = [];
 
-      // switch (domain) {
-      //   case 'hotnews.ro':
-      //     articles = parseHotNews(document);
-      //     break;
-      //   case 'libertatea.ro':
-      //     articles = parseLibertatea(document);
-      //     break;
-      //   case 'tvrinfo.ro':
-      //     articles = parseTvrInfo(document);
-      //     break;
-      //   case 'romaniatv.net':
-      //     articles = parseRomaniaTV(document);
-      //     break;
-      //   case 'antena3.ro':
-      //     articles = parseAntena3(document);
-      //     break;
-      //   default:
-      //     articles = [];
-      // }
+      switch (domain) {
+        case 'hotnews.ro':
+          articles = parseHotNews(document);
+          break;
+        case 'libertatea.ro':
+          articles = parseLibertatea(document);
+          break;
+        case 'romaniatv.net':
+          articles = parseRomaniaTV(document);
+          break;
+        case 'antena3.ro':
+          articles = parseAntena3(document);
+          break;
+        default:
+          articles = [];
+      }
 
       return _removeDuplicatesInList(articles);
     } catch (e) {
@@ -168,7 +172,7 @@ class CrawlerService {
     final uniqueArticles = <Article>[];
 
     for (var article in articles) {
-      final key = article.title.trim().toLowerCase();
+      final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
       if (!seen.contains(key)) {
         seen.add(key);
         uniqueArticles.add(article);

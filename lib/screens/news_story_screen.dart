@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
+import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../services/crawler_service.dart';
 import '../widgets/FloatingSearchAndFilter.dart';
@@ -24,6 +27,8 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
 
   Set<String> selectedCategories = {};
   int minimumSources = 2;
+  Set<String> selectedSources =
+      Globals.allSources.map((source) => source.toLowerCase()).toSet();
 
   late Stream<List<NewsStory>> _storiesStream;
   bool _isLoading = true; // Track loading state
@@ -143,6 +148,8 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                                       _searchQuery = '';
                                       selectedCategories.clear();
                                       minimumSources = 1;
+                                      selectedSources =
+                                          Globals.allSources.map((source) => source.toLowerCase()).toSet();
                                     });
                                   },
                                   child: const Text('Clear filters'),
@@ -173,11 +180,19 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             ),
             FloatingSearchAndFilter(
               selectedCategories: selectedCategories,
+              selectedSources: selectedSources,
               minimumSources: minimumSources,
               showSearchBar: _showSearchBar,
               searchController: _searchController,
               searchQuery: _searchQuery,
               searchFocusNode: _searchFocusNode,
+              onSourceToggled: (source, isSelected) {
+                setState(() {
+                  isSelected
+                      ? selectedSources.add(source)
+                      : selectedSources.remove(source);
+                });
+              },
               onSearchChanged: (value) {
                 setState(() {
                   _searchQuery = value.toLowerCase();
@@ -211,33 +226,35 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   // Centralized filtering logic
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
+      // 1. Source Filter (Check if story has at least one article from an active source)
+      final storySourceIds =
+          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+      final hasActiveSource = storySourceIds.any(
+        (id) => selectedSources.contains(id),
+      );
+      if (!hasActiveSource) return false;
+
+      // 2. Category Filter
       if (selectedCategories.isNotEmpty) {
-        // Merge all story types into a single set
         final allTypes = <String>{
           ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
           ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
         };
-
-        if (allTypes.isEmpty) return false;
-
-        if (!selectedCategories.every(allTypes.contains)) {
+        if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains)) {
           return false;
         }
       }
 
+      // 3. Minimum Sources Filter
       final uniqueSources =
           story.articles.map((a) => a.sourceName).toSet().length;
       if (uniqueSources < minimumSources) return false;
 
+      // 4. Search Filter
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.trimRight();
         return story.canonicalTitle.toLowerCase().contains(q) ||
-            (story.summary?.toLowerCase().contains(q) ?? false) ||
-            story.articles.any(
-              (a) =>
-                  a.title.toLowerCase().contains(q) ||
-                  a.description.toLowerCase().contains(q),
-            );
+            (story.summary?.toLowerCase().contains(q) ?? false);
       }
 
       return true;
@@ -251,6 +268,45 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   ) {
     final manualTypes = story.storyTypes ?? [];
     final aiTypes = story.inferredStoryTypes ?? [];
+
+    // Extract unique publisher assets and the date range
+    final articles = story.articles ?? [];
+
+    // 1. Get unique source names/icons (e.g., 'digi24', 'pro-tv')
+    final uniqueSources =
+        articles
+            .map(
+              (a) => a.sourceName,
+            ) // Or whatever field holds the source identifier
+            .toSet()
+            .toList();
+
+    // 2. Find the earliest and latest dates
+    final dates = articles.map((a) => a.publishedAt).toList();
+    dates.sort(); // Oldest to newest
+
+    final String dateDisplay;
+
+    if (dates.isEmpty) {
+      dateDisplay = "No date";
+    } else {
+      final now = DateTime.now();
+      final firstDate = dates.first;
+      final lastDate = dates.last;
+
+      // 1. If all articles are from the same day
+      if (DateFormat('yyyyMMdd').format(firstDate) ==
+          DateFormat('yyyyMMdd').format(lastDate)) {
+        // Show how long ago the most recent article was
+        dateDisplay = timeago.format(lastDate);
+      }
+      // 2. If they span multiple days
+      else {
+        final String firstDateStr = DateFormat('MMM d').format(firstDate);
+        final String lastDateStr = DateFormat('MMM d').format(lastDate);
+        dateDisplay = "$firstDateStr - $lastDateStr";
+      }
+    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -288,6 +344,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                     Positioned(
                       top: 12,
                       left: 12,
+                      right: 12,
                       child: Wrap(
                         spacing: 6,
                         runSpacing: 6,
@@ -336,6 +393,55 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                     visible: story.summary != null,
                     child: const SizedBox(height: 16),
                   ),
+                  // 1. Add the Row at the bottom of the Padding's Column
+                  Row(
+                    children: [
+                      // Stack of icons
+                      SizedBox(
+                        height: 24,
+                        width: (uniqueSources.length * 14.0) + 10,
+                        // Dynamic width based on count
+                        child: Stack(
+                          children: List.generate(uniqueSources.length, (
+                            index,
+                          ) {
+                            return Positioned(
+                              left: index * 14.0, // Overlap effect
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.black,
+                                    width: 2,
+                                  ), // Provides separation
+                                ),
+                                child: CircleAvatar(
+                                  radius: 10,
+                                  backgroundColor: Colors.grey[900],
+                                  // Map sourceId to your local asset path
+                                  backgroundImage: AssetImage(
+                                    'assets/images/${uniqueSources[index].toLowerCase()}.png',
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Combined Source Text and Date
+                      Expanded(
+                        child: Text(
+                          "${uniqueSources.join(', ')} • $dateDisplay",
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -346,28 +452,33 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   Widget _buildTagChip(String label, {required bool isAi}) {
-    return ClipRRect( // Clips the blur to the border radius
+    return ClipRRect(
+      // Clips the blur to the border radius
       borderRadius: BorderRadius.circular(6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           // Use higher opacity and a touch of white for AI to fight dark/busy images
-          color: isAi
-              ? Colors.deepPurple.withValues(alpha: 0.85)
-              : Colors.black.withValues(alpha: 0.7),
+          color:
+              isAi
+                  ? Colors.deepPurple.withValues(alpha: 0.85)
+                  : Colors.black.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isAi ? Colors.deepPurple : Colors.white24,
             width: 1,
           ),
           // Optional: Add a subtle outer glow for the AI tag
-          boxShadow: isAi ? [
-            BoxShadow(
-              color: Colors.deepPurple.withValues(alpha: 0.3),
-              blurRadius: 8,
-              spreadRadius: 1,
-            )
-          ] : [],
+          boxShadow:
+              isAi
+                  ? [
+                    BoxShadow(
+                      color: Colors.deepPurple.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                  : [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

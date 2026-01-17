@@ -9,6 +9,7 @@ import 'package:news_aggregator/services/score_service.dart';
 import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
+import '../parsers/adevarul_parser.dart';
 import '../parsers/digi24_parser.dart';
 import 'firebase_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
@@ -107,10 +108,16 @@ class CrawlerService {
 
   Future<List<Article>> crawlSite(String url) async {
     try {
+      // Special handling for Digi24 - use dedicated parser
       if (url.contains('digi24.ro')) {
         final digi24Parser = Digi24Parser();
-        final digiArticles = await digi24Parser.parseAllCategories();
-        return _removeDuplicatesInList(digiArticles);
+        return await digi24Parser.parse();
+      }
+
+      // Special handling for Adevarul - use dedicated parser
+      if (url.contains('adevarul.ro')) {
+        final adevaruParser = AdevarulParser();
+        return await adevaruParser.parse();
       }
 
       final response = await http.get(
@@ -128,28 +135,25 @@ class CrawlerService {
 
       List<Article> articles = [];
 
-      switch (domain) {
-        // case 'adevarul.ro':
-        //   articles = parseAdevarul(document);
-        //   break;
-        // case 'hotnews.ro':
-        //   articles = parseHotNews(document);
-        //   break;
-        // case 'libertatea.ro':
-        //   articles = parseLibertatea(document);
-        //   break;
-        // case 'tvrinfo.ro':
-        //   articles = parseTvrInfo(document);
-        //   break;
-        // case 'romaniatv.net':
-        //   articles = parseRomaniaTV(document);
-        //   break;
-        // case 'antena3.ro':
-        //   articles = parseAntena3(document);
-        //   break;
-        default:
-          articles = [];
-      }
+      // switch (domain) {
+      //   case 'hotnews.ro':
+      //     articles = parseHotNews(document);
+      //     break;
+      //   case 'libertatea.ro':
+      //     articles = parseLibertatea(document);
+      //     break;
+      //   case 'tvrinfo.ro':
+      //     articles = parseTvrInfo(document);
+      //     break;
+      //   case 'romaniatv.net':
+      //     articles = parseRomaniaTV(document);
+      //     break;
+      //   case 'antena3.ro':
+      //     articles = parseAntena3(document);
+      //     break;
+      //   default:
+      //     articles = [];
+      // }
 
       return _removeDuplicatesInList(articles);
     } catch (e) {
@@ -164,7 +168,7 @@ class CrawlerService {
     final uniqueArticles = <Article>[];
 
     for (var article in articles) {
-      final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+      final key = article.title.trim().toLowerCase();
       if (!seen.contains(key)) {
         seen.add(key);
         uniqueArticles.add(article);
@@ -172,44 +176,6 @@ class CrawlerService {
     }
 
     return uniqueArticles;
-  }
-
-  List<Article> parseAdevarul(Document document) {
-    List<Article> articles = [];
-    final containers = document.querySelectorAll('div.container');
-
-    for (var container in containers) {
-      try {
-        final title = container.querySelector('.title')?.text.trim() ?? '';
-        final link = container.querySelector('a')?.attributes['href'];
-        final description =
-            container.querySelector('.summary')?.text.trim() ?? '';
-
-        final imgElement =
-            container.querySelector('.cover img') ??
-                container.querySelector('.poster img') ??
-                container.querySelector('img');
-
-        final imageUrl = imgElement?.attributes['src'];
-
-        if (title.isEmpty || link == null) continue;
-
-        articles.add(
-          Article(
-            title: Globals.cleanTitle(title),
-            description: description,
-            url: link.startsWith('http') ? link : 'https://adevarul.ro$link',
-            urlToImage: imageUrl,
-            publishedAt: DateTime.now(),
-            sourceName: 'Adevarul',
-          ),
-        );
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return articles;
   }
 
   List<Article> parseHotNews(Document document) {

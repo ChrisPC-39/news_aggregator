@@ -18,7 +18,7 @@ class Digi24Parser {
   static const String _rssUrl = 'https://www.digi24.ro/rss_files/google_news.xml';
 
   /// Main entry point - parse all Digi24 categories
-  Future<List<Article>> parseAllCategories() async {
+  Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 
     // Step 1: Fetch RSS feed to get publication dates

@@ -11,7 +11,8 @@ class FirebaseArticleRepository {
   static const int maxBatches = 10;
 
   /// Watch all batches and emit combined articles whenever any batch changes
-  Stream<List<Article>> watchArticles() {
+  /// Optional: filter articles by date range
+  Stream<List<Article>> watchArticles({DateTime? since}) {
     return _firestore
         .collection(_collection)
         .doc('metadata')
@@ -33,7 +34,7 @@ class FirebaseArticleRepository {
               .collection(_collection)
               .doc('batch_$i')
               .snapshots()
-              .map((snapshot) => _parseBatchArticles(snapshot)),
+              .map((snapshot) => _parseBatchArticles(snapshot, since: since)),
         );
       }
 
@@ -67,16 +68,23 @@ class FirebaseArticleRepository {
   }
 
   /// Parse articles from a batch document
-  List<Article> _parseBatchArticles(DocumentSnapshot snapshot) {
+  List<Article> _parseBatchArticles(DocumentSnapshot snapshot, {DateTime? since}) {
     if (!snapshot.exists) return [];
 
     final data = snapshot.data() as Map<String, dynamic>?;
     if (data == null || !data.containsKey('articles')) return [];
 
     final articlesData = data['articles'] as List<dynamic>;
-    return articlesData
+    final articles = articlesData
         .map((json) => Article.fromJson(json as Map<String, dynamic>))
         .toList();
+
+    // Filter by date if 'since' parameter is provided
+    if (since != null) {
+      return articles.where((article) => article.publishedAt.isAfter(since)).toList();
+    }
+
+    return articles;
   }
 
   /// Sync new articles to Firestore using batch system
@@ -168,7 +176,7 @@ class FirebaseArticleRepository {
             urlToImage: updatedArticle.urlToImage,
             publishedAt: articles[j].publishedAt, // Keep original date
             content: updatedArticle.content,
-            sourceName: articles[j].sourceName, // Keep original source
+            sourceName: updatedArticle.sourceName,
             aiSummary: updatedArticle.aiSummary,
           );
 

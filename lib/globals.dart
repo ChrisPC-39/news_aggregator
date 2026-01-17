@@ -2,9 +2,13 @@ class Globals {
   static final leftSources = ["Adevarul", "HotNews", "Libertatea"];
   static final centerSources = ["Digi24", "TVRInfo"];
   static final rightSources = ["RomaniaTV", "Antena3"];
+  // static final allSources = [
+  //   "Adevarul", "HotNews", "Libertatea",
+  //   "Digi24", "TVRInfo", "RomaniaTV", "Antena3"
+  // ];
   static final allSources = [
-    "Adevarul", "HotNews", "Libertatea",
-    "Digi24", "TVRInfo", "RomaniaTV", "Antena3"
+    "Adevarul",
+    "Digi24",
   ];
 
   static String cleanTitle(String raw) {
@@ -471,6 +475,7 @@ class Globals {
     'Știință și Tehnologie': [
       // Exclude science education policy (that's politics)
       'reforma invatamant', 'ministrul educatiei', 'educatie nationala',
+      'presedinte al romaniei',
       // Exclude tech business/economic news
       'actiuni apple', 'actiuni tesla', 'bursa tech',
     ],
@@ -491,7 +496,7 @@ class Globals {
       'scandal la federatie', 'alegeri federatie',
       // Exclude unrelated words that might appear in articles
       'autostraz', 'utilaj', 'autostrada', 'transport', 'securitate', 'militar',
-      'nato',
+      'nato', 'presedinte al romaniei',
     ],
     'Vreme': [
       // Exclude climate change politics/policy

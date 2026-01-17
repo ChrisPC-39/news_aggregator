@@ -162,12 +162,14 @@ class ScoreService {
       }
 
       if (!added) {
+        final storyType = article.category == null ? null : [article.category!];
+
         stories.add(
           NewsStory(
             canonicalTitle: article.title,
             summary: article.description,
             articles: [article],
-            storyTypes: null,
+            storyTypes: storyType,
             imageUrl: article.urlToImage,
           ),
         );
@@ -185,13 +187,26 @@ class ScoreService {
               )
               .description;
 
-      story.storyTypes = inferStoryTypes(story);
+      // Normalize existing story types for comparison
+      final existingTypes =
+          story.storyTypes?.map((t) => t.toLowerCase()).toSet() ?? {};
+
+      final inferred = inferStoryTypes(story)
+          .map((e) => e.toLowerCase())
+          .toSet()
+          .difference(existingTypes)
+          .toList();
+
+      story.inferredStoryTypes = inferred.isEmpty ? null : inferred;
     }
 
     return stories;
   }
 
-  List<NewsStory> groupArticlesIncremental(List<NewsStory> existing, List<Article> newArticles) {
+  List<NewsStory> groupArticlesIncremental(
+    List<NewsStory> existing,
+    List<Article> newArticles,
+  ) {
     // 1️⃣ Convert existing canonicalTitles to a set
     final existingTitles = existing.map((s) => s.canonicalTitle).toSet();
 
@@ -206,7 +221,9 @@ class ScoreService {
         merged.add(story);
       } else {
         // Optional: merge new articles into existing story
-        final idx = merged.indexWhere((s) => s.canonicalTitle == story.canonicalTitle);
+        final idx = merged.indexWhere(
+          (s) => s.canonicalTitle == story.canonicalTitle,
+        );
         merged[idx].articles.addAll(story.articles);
       }
     }

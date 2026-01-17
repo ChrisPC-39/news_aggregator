@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 import '../globals.dart';
 import '../models/news_story_model.dart';
@@ -25,6 +27,8 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
 
   Set<String> selectedCategories = {};
   int minimumSources = 2;
+  Set<String> selectedSources =
+      Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
 
   late Stream<List<NewsStory>> _storiesStream;
   bool _isLoading = true; // Track loading state
@@ -32,6 +36,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   @override
   void initState() {
     super.initState();
+    _crawlerService.fetchAllSources();
     _scrollController.addListener(_onScroll);
     _storiesStream = _crawlerService.watchGroupedStories().asBroadcastStream();
 
@@ -96,14 +101,15 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
           // Add loading indicator at bottom of AppBar
           bottom: PreferredSize(
             preferredSize: Size.fromHeight(_isLoading ? 3 : 0),
-            child: _isLoading
-                ? LinearProgressIndicator(
-              backgroundColor: Colors.white.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Colors.white.withOpacity(0.8),
-              ),
-            )
-                : const SizedBox.shrink(),
+            child:
+                _isLoading
+                    ? LinearProgressIndicator(
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white.withOpacity(0.8),
+                      ),
+                    )
+                    : const SizedBox.shrink(),
           ),
         ),
         body: Stack(
@@ -129,29 +135,30 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                 if (stories.isEmpty) {
                   return Center(
                     child:
-                    _searchQuery.isNotEmpty
-                        ? Text('No stories match "$_searchQuery"')
-                        : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('No news found.'),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                              selectedCategories.clear();
-                              minimumSources = 1;
-                            });
-                          },
-                          child: const Text('Clear filters'),
-                        ),
-                      ],
-                    ),
+                        _searchQuery.isNotEmpty
+                            ? Text('No stories match "$_searchQuery"')
+                            : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('No news found.'),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                      selectedCategories.clear();
+                                      minimumSources = 1;
+                                      selectedSources =
+                                          Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
+                                    });
+                                  },
+                                  child: const Text('Clear filters'),
+                                ),
+                              ],
+                            ),
                   );
                 }
 
-                // FIXED: Remove Positioned.fill, return ListView directly
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.only(
@@ -164,7 +171,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                   itemBuilder: (context, index) {
                     final story = stories[index];
                     final sources =
-                    story.articles.map((a) => a.sourceName).toList();
+                        story.articles.map((a) => a.sourceName).toList();
 
                     return buildNewsStoryCard(context, story, sources);
                   },
@@ -173,11 +180,19 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             ),
             FloatingSearchAndFilter(
               selectedCategories: selectedCategories,
+              selectedSources: selectedSources,
               minimumSources: minimumSources,
               showSearchBar: _showSearchBar,
               searchController: _searchController,
               searchQuery: _searchQuery,
               searchFocusNode: _searchFocusNode,
+              onSourceToggled: (source, isSelected) {
+                setState(() {
+                  isSelected
+                      ? selectedSources.add(source)
+                      : selectedSources.remove(source);
+                });
+              },
               onSearchChanged: (value) {
                 setState(() {
                   _searchQuery = value.toLowerCase();
@@ -191,10 +206,11 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                 });
               },
               onCategoryToggled: (category, selected) {
+                final normalized = category.toLowerCase().trim();
                 setState(() {
                   selected
-                      ? selectedCategories.add(category)
-                      : selectedCategories.remove(category);
+                      ? selectedCategories.add(normalized)
+                      : selectedCategories.remove(normalized);
                 });
               },
               onMinimumSourcesChanged: (value) {
@@ -207,31 +223,38 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     );
   }
 
-  // 🔎 Centralized filtering logic
+  // Centralized filtering logic
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
-      if (selectedCategories.isNotEmpty) {
-        if (story.storyTypes == null || story.storyTypes!.isEmpty) return false;
+      // 1. Source Filter (Check if story has at least one article from an active source)
+      final storySourceIds =
+          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+      final hasActiveSource = storySourceIds.any(
+        (id) => selectedSources.contains(id),
+      );
+      if (!hasActiveSource) return false;
 
-        // Require ALL selected categories to be present
-        if (!selectedCategories.every((cat) => story.storyTypes!.contains(cat))) {
+      // 2. Category Filter
+      if (selectedCategories.isNotEmpty) {
+        final allTypes = <String>{
+          ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
+          ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
+        };
+        if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains)) {
           return false;
         }
       }
 
+      // 3. Minimum Sources Filter
       final uniqueSources =
           story.articles.map((a) => a.sourceName).toSet().length;
       if (uniqueSources < minimumSources) return false;
 
+      // 4. Search Filter
       if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery;
+        final q = _searchQuery.trimRight();
         return story.canonicalTitle.toLowerCase().contains(q) ||
-            (story.summary?.toLowerCase().contains(q) ?? false) ||
-            story.articles.any(
-                  (a) =>
-              a.title.toLowerCase().contains(q) ||
-                  a.description.toLowerCase().contains(q),
-            );
+            (story.summary?.toLowerCase().contains(q) ?? false);
       }
 
       return true;
@@ -239,30 +262,50 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   Widget buildNewsStoryCard(
-      BuildContext context,
-      NewsStory story,
-      List<String> sources,
-      ) {
-    int leftCount =
-        sources.where((s) => Globals.leftSources.contains(s)).length;
-    int centerCount =
-        sources.where((s) => Globals.centerSources.contains(s)).length;
-    int rightCount =
-        sources.where((s) => Globals.rightSources.contains(s)).length;
+    BuildContext context,
+    NewsStory story,
+    List<String> sources,
+  ) {
+    final manualTypes = story.storyTypes ?? [];
+    final aiTypes = story.inferredStoryTypes ?? [];
 
-    // Only include categories with count > 0
-    final counts = {
-      "Left": leftCount,
-      "Center": centerCount,
-      "Right": rightCount,
-    }..removeWhere((_, value) => value == 0);
+    // Extract unique publisher assets and the date range
+    final articles = story.articles;
 
-    final totalCount = counts.values.fold(0, (a, b) => a + b);
+    // 1. Get unique source names/icons (e.g., 'digi24', 'pro-tv')
+    final uniqueSources =
+        articles
+            .map(
+              (a) => a.sourceName,
+            ) // Or whatever field holds the source identifier
+            .toSet()
+            .toList();
 
-    // If totalCount == 0, give dummy flex values to avoid Row collapse
-    final flexLeft = leftCount > 0 ? leftCount : 0;
-    final flexCenter = centerCount > 0 ? centerCount : 0;
-    final flexRight = rightCount > 0 ? rightCount : 0;
+    // 2. Find the earliest and latest dates
+    final dates = articles.map((a) => a.publishedAt).toList();
+    dates.sort(); // Oldest to newest
+
+    final String dateDisplay;
+
+    if (dates.isEmpty) {
+      dateDisplay = "No date";
+    } else {
+      final firstDate = dates.first;
+      final lastDate = dates.last;
+
+      // 1. If all articles are from the same day
+      if (DateFormat('yyyyMMdd').format(firstDate) ==
+          DateFormat('yyyyMMdd').format(lastDate)) {
+        // Show how long ago the most recent article was
+        dateDisplay = timeago.format(lastDate);
+      }
+      // 2. If they span multiple days
+      else {
+        final String firstDateStr = DateFormat('MMM d').format(firstDate);
+        final String lastDateStr = DateFormat('MMM d').format(lastDate);
+        dateDisplay = "$firstDateStr - $lastDateStr";
+      }
+    }
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -282,9 +325,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             SizedBox(
               width: double.infinity,
               height:
-              story.imageUrl != null && story.imageUrl!.isNotEmpty
-                  ? 200
-                  : 35,
+                  story.imageUrl != null && story.imageUrl!.isNotEmpty
+                      ? 200
+                      : 35,
               child: Stack(
                 children: [
                   if (story.imageUrl != null && story.imageUrl!.isNotEmpty)
@@ -296,34 +339,22 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                       errorBuilder: (_, __, ___) => const SizedBox(),
                     ),
                   // The Tag Overlay
-                  if (story.storyTypes != null && story.storyTypes!.isNotEmpty)
+                  if (manualTypes.isNotEmpty || aiTypes.isNotEmpty)
                     Positioned(
                       top: 12,
                       left: 12,
+                      right: 12,
                       child: Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: story.storyTypes!.map((type) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              type.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                        children: [
+                          ...manualTypes.map(
+                            (type) => _buildTagChip(type, isAi: false),
+                          ),
+                          ...aiTypes.map(
+                            (type) => _buildTagChip(type, isAi: true),
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -361,36 +392,110 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                     visible: story.summary != null,
                     child: const SizedBox(height: 16),
                   ),
-
-                  // Segmented Bar
-                  SizedBox(
-                    height: 10,
-                    child: Row(
-                      children: [
-                        if (flexLeft > 0)
-                          Expanded(
-                            flex: flexLeft,
-                            child: Container(color: Colors.blue[400]),
+                  // 1. Add the Row at the bottom of the Padding's Column
+                  Row(
+                    children: [
+                      // Stack of icons
+                      SizedBox(
+                        height: 24,
+                        width: (uniqueSources.length * 14.0) + 10,
+                        // Dynamic width based on count
+                        child: Stack(
+                          children: List.generate(uniqueSources.length, (
+                            index,
+                          ) {
+                            return Positioned(
+                              left: index * 14.0, // Overlap effect
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.black,
+                                    width: 2,
+                                  ), // Provides separation
+                                ),
+                                child: CircleAvatar(
+                                  radius: 10,
+                                  backgroundColor: Colors.grey[900],
+                                  // Map sourceId to your local asset path
+                                  backgroundImage: AssetImage(
+                                    'assets/images/${uniqueSources[index].toLowerCase()}.png',
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Combined Source Text and Date
+                      Expanded(
+                        child: Text(
+                          "${uniqueSources.join(', ')} • $dateDisplay",
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 11,
                           ),
-                        if (flexCenter > 0)
-                          Expanded(
-                            flex: flexCenter,
-                            child: Container(color: Colors.grey[400]),
-                          ),
-                        if (flexRight > 0)
-                          Expanded(
-                            flex: flexRight,
-                            child: Container(color: Colors.red[400]),
-                          ),
-                        if (totalCount == 0)
-                          Expanded(
-                            flex: 1,
-                            child: Container(color: Colors.grey.shade300),
-                          ),
-                      ],
-                    ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTagChip(String label, {required bool isAi}) {
+    return ClipRRect(
+      // Clips the blur to the border radius
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          // Use higher opacity and a touch of white for AI to fight dark/busy images
+          color:
+              isAi
+                  ? Colors.deepPurple.withValues(alpha: 0.85)
+                  : Colors.black.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isAi ? Colors.deepPurple : Colors.white24,
+            width: 1,
+          ),
+          // Optional: Add a subtle outer glow for the AI tag
+          boxShadow:
+              isAi
+                  ? [
+                    BoxShadow(
+                      color: Colors.deepPurple.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                  : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isAi)
+              const Icon(
+                Icons.auto_awesome,
+                size: 12,
+                color: Colors.white, // White icon pops better on purple
+              ),
+            if (isAi) const SizedBox(width: 4),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                color: Colors.white, // Solid white text is the most readable
+                fontSize: 10,
+                fontWeight: FontWeight.w900, // Extra bold for small text
+                letterSpacing: 0.5,
               ),
             ),
           ],

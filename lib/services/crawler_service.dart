@@ -119,40 +119,6 @@ class CrawlerService {
         final tvrinfoParser = TvrInfoParser();
         return await tvrinfoParser.parse();
       }
-
-      // final response = await http.get(
-      //   Uri.parse(url),
-      //   headers: {
-      //     'User-Agent':
-      //     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      //   },
-      // );
-      //
-      // if (response.statusCode != 200) return [];
-      //
-      // final document = parser.parse(utf8.decode(response.bodyBytes));
-      // final domain = Uri.parse(url).host.replaceFirst('www.', '');
-      //
-      // List<Article> articles = [];
-
-      // switch (domain) {
-      //   case 'hotnews.ro':
-      //     articles = parseHotNews(document);
-      //     break;
-      //   case 'libertatea.ro':
-      //     articles = parseLibertatea(document);
-      //     break;
-      //   case 'romaniatv.net':
-      //     articles = parseRomaniaTV(document);
-      //     break;
-      //   case 'antena3.ro':
-      //     articles = parseAntena3(document);
-      //     break;
-      //   default:
-      //     articles = [];
-      // }
-
-      // return _removeDuplicatesInList(articles);
       return [];
     } catch (e) {
       return [];

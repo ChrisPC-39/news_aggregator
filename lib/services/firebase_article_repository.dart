@@ -213,6 +213,11 @@ class FirebaseArticleRepository {
     if (batch0Articles.length > articlesPerBatch) {
       await _rotateBatches(batch0Articles, totalBatches);
     } else {
+      print('--- Batch 0 Articles (${batch0Articles.length}) ---');
+      for (var i = 0; i < batch0Articles.length; i++) {
+        print('[$i] ${batch0Articles[i].title}');
+      }
+      print('-------------------------------------------');
       // Just update batch_0
       await _firestore.collection(_collection).doc('batch_0').set({
         'articles': batch0Articles.map((a) => a.toJson()).toList(),
@@ -282,9 +287,32 @@ class FirebaseArticleRepository {
 
   /// Check if article content has changed
   bool _hasArticleChanged(Article existing, Article updated) {
-    return existing.description != updated.description ||
-        existing.url != updated.url ||
-        existing.urlToImage != updated.urlToImage;
+    bool changed = false;
+    List<String> diffs = [];
+
+    if (existing.description != updated.description) {
+      diffs.add('DESCRIPTION: "${existing.description}" -> "${updated.description}"');
+      changed = true;
+    }
+
+    if (existing.url != updated.url) {
+      diffs.add('URL: ${existing.url} -> ${updated.url}');
+      changed = true;
+    }
+
+    if (existing.urlToImage != updated.urlToImage) {
+      diffs.add('IMAGE: ${existing.urlToImage} -> ${updated.urlToImage}');
+      changed = true;
+    }
+
+    if (changed) {
+      print('🔄 Article Changed: ${existing.title}');
+      for (var d in diffs) {
+        print('   └─ $d');
+      }
+    }
+
+    return changed;
   }
 
   /// Initialize Firestore structure (call once on first setup)

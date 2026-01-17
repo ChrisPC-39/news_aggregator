@@ -19,21 +19,37 @@ class AdevarulParser {
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 
-    // Crawl each category page
     for (final entry in _categoryUrls.entries) {
       try {
-        final categoryArticles = await _parseCategoryPage(
-          entry.key,
-          entry.value,
-        );
+        final categoryArticles = await _parseCategoryPage(entry.key, entry.value);
         allArticles.addAll(categoryArticles);
       } catch (e) {
-        // Skip failed categories
         continue;
       }
     }
 
-    return allArticles;
+    // --- Deduplication Logic ---
+    final Map<String, Article> uniqueArticles = {};
+
+    for (final article in allArticles) {
+      final title = article.title.trim();
+
+      if (!uniqueArticles.containsKey(title)) {
+        // New title, just add it
+        uniqueArticles[title] = article;
+      } else {
+        // Duplicate found, compare timestamps
+        final existingArticle = uniqueArticles[title]!;
+        if (article.publishedAt.isAfter(existingArticle.publishedAt)) {
+          // The new one is newer, replace the old one
+          uniqueArticles[title] = article;
+        }
+      }
+    }
+
+    print('✅ Adevarul: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    // Convert map values back to a list
+    return uniqueArticles.values.toList();
   }
 
   /// Parse a single category page

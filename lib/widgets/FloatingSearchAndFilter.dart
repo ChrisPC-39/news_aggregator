@@ -179,7 +179,7 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                                   scrollDirection: Axis.horizontal,
                                   child: Row(
                                     children:
-                                        Globals.allSources.map((sourceName) {
+                                        Globals.sourceConfigs.keys.map((sourceName) {
                                           // Inside Globals.allSources.map(...)
                                           final sourceId =
                                               sourceName.toLowerCase();

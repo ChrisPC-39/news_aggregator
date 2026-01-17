@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../globals.dart';
 import '../models/news_story_model.dart';
 
 class GroupedNewsScreen extends StatefulWidget {
@@ -14,34 +13,6 @@ class GroupedNewsScreen extends StatefulWidget {
 }
 
 class _GroupedNewsScreenState extends State<GroupedNewsScreen> {
-  String getBiasType(String sourceName) {
-    final name = sourceName.toLowerCase();
-    if (Globals.leftSources.any((s) => name.contains(s.toLowerCase()))) {
-      return 'Left';
-    }
-    if (Globals.centerSources.any((s) => name.contains(s.toLowerCase()))) {
-      return 'Center';
-    }
-    if (Globals.rightSources.any((s) => name.contains(s.toLowerCase()))) {
-      return 'Right';
-    }
-    return 'Neutral';
-  }
-
-  // 2. Helper for bias colors
-  Color getBiasColor(String bias) {
-    switch (bias) {
-      case 'Left':
-        return Colors.blue[400]!;
-      case 'Center':
-        return Colors.grey[400]!;
-      case 'Right':
-        return Colors.red[400]!;
-      default:
-        return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final articles = widget.story.articles;

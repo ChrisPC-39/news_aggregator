@@ -34,12 +34,31 @@ class Digi24Parser {
         );
         allArticles.addAll(categoryArticles);
       } catch (e) {
-        // Skip failed categories
         continue;
       }
     }
 
-    return allArticles;
+    // --- Deduplication Logic ---
+    final Map<String, Article> uniqueArticles = {};
+
+    for (final article in allArticles) {
+      // Normalize the title to handle slight variations in casing/spacing
+      final String lookupTitle = article.title.toLowerCase().trim();
+
+      if (!uniqueArticles.containsKey(lookupTitle)) {
+        uniqueArticles[lookupTitle] = article;
+      } else {
+        // Check if this version is newer than the one we already stored
+        final existing = uniqueArticles[lookupTitle]!;
+        if (article.publishedAt.isAfter(existing.publishedAt)) {
+          uniqueArticles[lookupTitle] = article;
+        }
+      }
+    }
+
+    print('✅ Digi24: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    // Return only the values of the map (the latest unique articles)
+    return uniqueArticles.values.toList();
   }
 
   /// Fetch RSS feed and create a map of URL -> publication date

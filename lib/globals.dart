@@ -1,34 +1,34 @@
 class Globals {
-  static final leftSources = ["Adevarul", "HotNews", "Libertatea"];
-  static final centerSources = ["Digi24", "TVRInfo"];
-  static final rightSources = ["RomaniaTV", "Antena3"];
   // static final allSources = [
   //   "Adevarul", "HotNews", "Libertatea",
   //   "Digi24", "TVRInfo", "RomaniaTV", "Antena3"
   // ];
-  static final allSources = [
-    "Adevarul",
-    "Digi24",
-    "TVRInfo",
-  ];
+  // static final allSources = [
+  //   "Adevarul",
+  //   "Digi24",
+  //   "TVRInfo",
+  // ];
 
-  static String cleanTitle(String raw) {
-    return raw
-        .replaceAll(RegExp(r'[\n\t]+'), ' -') // newlines/tabs → dash
-        .replaceAll(RegExp(r' +'), ' ')      // multiple spaces → single space
-        .trim();
-  }
+  static final Map<String, String> sourceConfigs = {
+    "Adevarul": "https://adevarul.ro/",
+    "Digi24": "https://www.digi24.ro/",
+    "TVRInfo": "https://tvrinfo.ro/",
+    "HotNews": "https://hotnews.ro/",
+    "Libertatea": "https://www.libertatea.ro/",
+    "RomaniaTV": "https://www.romaniatv.net/",
+    "Antena3": "https://www.antena3.ro/",
+  };
 
   // 'https://stirileprotv.ro/ultimele-stiri/', // Not working due to dynamically loaded JS content
-  static List<String> urls = [
-    'https://adevarul.ro/',
-    'https://hotnews.ro/',
-    'https://www.digi24.ro/',
-    'https://www.libertatea.ro/',
-    'https://tvrinfo.ro/',
-    'https://www.romaniatv.net/',
-    'https://www.antena3.ro/',
-  ];
+  // static List<String> urls = [
+  //   'https://adevarul.ro/',
+  //   'https://www.digi24.ro/',
+  //   'https://tvrinfo.ro/',
+  //   'https://hotnews.ro/',
+  //   'https://www.libertatea.ro/',
+  //   'https://www.romaniatv.net/',
+  //   'https://www.antena3.ro/',
+  // ];
 
   static Map<String, List<String>> storyTypeKeywords = {
     'General' : [],
@@ -502,7 +502,7 @@ class Globals {
     'Vreme': [
       // Exclude climate change politics/policy
       'politici climatice', 'summit climatic', 'acord climatic',
-      'politica de mediu',
+      'politica de mediu', 'trump', 'putin', 'razboi'
       // Exclude disaster response (that's politics/world news)
       'stare de urgenta', 'declaratie de dezastru', 'ajutor guvernamental',
     ],

@@ -17,8 +17,8 @@ class TvrInfoParser {
 
   /// Main entry point - parse all TvrInfo categories
   Future<List<Article>> parse() async {
-    final List<Article> allArticles = [];
-    final seenUrls = <String>{};
+    // Use a Map to track the latest article for each title
+    final Map<String, Article> uniqueArticles = {};
 
     // Crawl each category page
     for (final entry in _categoryUrls.entries) {
@@ -28,21 +28,32 @@ class TvrInfoParser {
           entry.value,
         );
 
-        // Deduplicate across categories
         for (final article in categoryArticles) {
-          if (!seenUrls.contains(article.url)) {
-            seenUrls.add(article.url);
-            allArticles.add(article);
+          // Normalize title for consistent matching
+          final String lookupTitle = article.title.toLowerCase().trim();
+
+          if (!uniqueArticles.containsKey(lookupTitle)) {
+            // If title is new, add it
+            uniqueArticles[lookupTitle] = article;
+          } else {
+            // If title exists, keep the one with the most recent timestamp
+            final existing = uniqueArticles[lookupTitle]!;
+            if (article.publishedAt.isAfter(existing.publishedAt)) {
+              uniqueArticles[lookupTitle] = article;
+            }
           }
         }
       } catch (e) {
-        print('⚠️ Error parsing ${entry.key}: $e');
+        print('⚠️ TvrInfo: Error parsing ${entry.key}: $e');
         continue;
       }
     }
 
-    print('✅ TvrInfo: Parsed ${allArticles.length} unique articles (deduplicated from categories)');
-    return allArticles;
+    // Convert the map back to a list
+    final result = uniqueArticles.values.toList();
+
+    print('✅ TvrInfo: Parsed ${result.length} unique articles (Title & Date deduplicated)');
+    return result;
   }
 
   /// Parse a single category page
@@ -51,8 +62,6 @@ class TvrInfoParser {
       String? category,
       ) async {
     final List<Article> articles = [];
-
-    print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -69,8 +78,6 @@ class TvrInfoParser {
 
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final articleNodes = document.querySelectorAll('article.article');
-
-    print('📦 Found ${articleNodes.length} articles on $url');
 
     for (final article in articleNodes) {
       try {
@@ -115,7 +122,6 @@ class TvrInfoParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

@@ -28,7 +28,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   Set<String> selectedCategories = {};
   int minimumSources = 2;
   Set<String> selectedSources =
-      Globals.allSources.map((source) => source.toLowerCase()).toSet();
+      Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
 
   late Stream<List<NewsStory>> _storiesStream;
   bool _isLoading = true; // Track loading state
@@ -149,7 +149,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                                       selectedCategories.clear();
                                       minimumSources = 1;
                                       selectedSources =
-                                          Globals.allSources.map((source) => source.toLowerCase()).toSet();
+                                          Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
                                     });
                                   },
                                   child: const Text('Clear filters'),
@@ -270,7 +270,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     final aiTypes = story.inferredStoryTypes ?? [];
 
     // Extract unique publisher assets and the date range
-    final articles = story.articles ?? [];
+    final articles = story.articles;
 
     // 1. Get unique source names/icons (e.g., 'digi24', 'pro-tv')
     final uniqueSources =
@@ -290,7 +290,6 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     if (dates.isEmpty) {
       dateDisplay = "No date";
     } else {
-      final now = DateTime.now();
       final firstDate = dates.first;
       final lastDate = dates.last;
 

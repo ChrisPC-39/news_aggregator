@@ -39,7 +39,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     _crawlerService.fetchAllSources();
     _scrollController.addListener(_onScroll);
     _storiesStream = _crawlerService.watchGroupedStories().asBroadcastStream();
-
+    //
     // Listen to processing status from CrawlerService
     _crawlerService.isProcessing.listen((isProcessing) {
       if (mounted) {
@@ -117,6 +117,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             StreamBuilder<List<NewsStory>>(
               stream: _storiesStream,
               builder: (context, snapshot) {
+                print('🎨 UI rebuilding');
                 if (snapshot.hasError) {
                   return Center(
                     child: Text(

@@ -11,7 +11,7 @@ class Digi24Parser {
     'https://www.digi24.ro/stiri/externe': 'World',
     'https://www.digi24.ro/stiri/economie': 'Business',
     'https://www.digi24.ro/stiri/actualitate': null,
-    'https://www.digi24.ro/stiri/sport': 'Sport',
+    // 'https://www.digi24.ro/stiri/sport': 'Sport',
     'https://www.digi24.ro/magazin/stil-de-viata': null,
   };
 

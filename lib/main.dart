@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:news_aggregator/screens/login_screen.dart';
 import 'package:news_aggregator/screens/news_story_screen.dart';
 import 'package:news_aggregator/services/firebase_article_repository.dart';
 
@@ -24,10 +26,11 @@ Future<void> main() async {
   Hive.registerAdapter(ArticleHiveAdapter());
   Hive.registerAdapter(NewsStoryHiveAdapter());
 
+  await Hive.openBox<ArticleHive>('articles');
   await Hive.openBox<NewsStoryHive>('groupedStories');
 
   // await Hive.box<NewsStoryHive>('groupedStories').clear();
-  await FirebaseArticleRepository().initialize();
+  // await FirebaseArticleRepository().initialize();
 
   runApp(const MyApp());
 }
@@ -58,7 +61,21 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const GroupedNewsResultsPage(),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          // If the snapshot has data, the user is logged in
+          if (snapshot.hasData) {
+            return const GroupedNewsResultsPage();
+          }
+          // Otherwise, show the login page
+          return const LoginPage();
+        },
+      ),
+      routes: {
+        '/login': (context) => const LoginPage(),
+        '/home': (context) => const GroupedNewsResultsPage(),
+      },
     );
   }
 }

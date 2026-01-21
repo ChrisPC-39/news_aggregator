@@ -14,6 +14,24 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isLogin = true;
+
+  void _toggleMode() {
+    setState(() {
+      _isLogin = !_isLogin;
+    });
+  }
+
+  void _handleLogin() {
+    AuthService().loginWithEmail(
+      "email",
+      "password",
+    );
+  }
+
+  void _handleSignUp() {
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
                 fit: BoxFit.cover,
               ),
             ),
-            child: Container(color: Colors.black.withOpacity(0.75)),
+            child: Container(color: Colors.black.withValues(alpha: 0.75)),
           ),
 
           // 2. The Glassmorphic Card
@@ -43,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                     child: Container(
-                      padding: const EdgeInsets.all(40),
+                      padding: const EdgeInsets.fromLTRB(40, 40, 40, 10),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(30),
@@ -91,27 +109,24 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 20),
 
-                          // Login Button
                           // Login Button with Purple Gradient
-                          Container(
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
                             width: double.infinity,
-                            height: 45,
+                            height: 40, // Slightly taller for a better feel
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(15),
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF8B5CF6), // Vibrant Purple
-                                  Color(0xFF6D28D9), // Deep Violet
-                                ],
+                              gradient: LinearGradient(
+                                colors: _isLogin
+                                    ? [const Color(0xFF8B5CF6), const Color(0xFF6D28D9)] // Login Purple
+                                    : [const Color(0xFF6D28D9), const Color(0xFF4C1D95)], // Darker Sign-up Purple
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF8B5CF6,
-                                  ).withOpacity(0.3),
-                                  blurRadius: 12,
+                                  color: const Color(0xFF8B5CF6).withOpacity(_isLogin ? 0.3 : 0.5),
+                                  blurRadius: _isLogin ? 12 : 20,
                                   offset: const Offset(0, 4),
                                 ),
                               ],
@@ -120,22 +135,25 @@ class _LoginPageState extends State<LoginPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               ),
-                              onPressed:
-                                  () => AuthService().loginWithEmail(
-                                    "email",
-                                    "password",
+                              onPressed: _isLogin ? _handleLogin : _handleSignUp,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                transitionBuilder: (Widget child, Animation<double> animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(scale: animation, child: child),
+                                  );
+                                },
+                                child: Text(
+                                  _isLogin ? "Login" : "Sign up",
+                                  key: ValueKey<bool>(_isLogin), // Crucial for AnimatedSwitcher to detect change
+                                  style: GoogleFonts.lexend(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
                                   ),
-                              // Connect your auth logic here
-                              child: Text(
-                                "Login",
-                                style: GoogleFonts.lexend(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
                                 ),
                               ),
                             ),
@@ -154,6 +172,47 @@ class _LoginPageState extends State<LoginPage> {
                             iconUrl:
                                 'https://freepnglogo.com/images/all_img/google-logo-2025-6ffb.png',
                             onTap: () {},
+                          ),
+                          const SizedBox(height: 25),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (Widget child, Animation<double> animation) {
+                              // This creates a fade + slight slide-up effect
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.2), // Start slightly below
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: Row(
+                              key: ValueKey<bool>(_isLogin), // Unique key to trigger animation
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _isLogin ? "Don't have an account?" : "Already have an account?",
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isLogin = !_isLogin;
+                                    });
+                                  },
+                                  child: Text(
+                                    _isLogin ? "Sign up" : "Login",
+                                    style: const TextStyle(
+                                      color: Color(0xFFA78BFA), // Light purple to match theme
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

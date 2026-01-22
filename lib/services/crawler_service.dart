@@ -26,7 +26,7 @@ class CrawlerService {
 
   /// Watch Firestore and return cached + updated grouped stories
   Stream<List<NewsStory>> watchGroupedStories() {
-    print('📍 watchGroupedStories called');
+    // print('📍 watchGroupedStories called');
     final initialStories = cache.load();
     final controller = StreamController<List<NewsStory>>();
     controller.add(initialStories);
@@ -34,7 +34,7 @@ class CrawlerService {
     bool isProcessing = false;
 
     localRepo.watchArticles().listen((articles) async {
-      print('🔄 watchArticles triggered with ${articles.length} articles');
+      // print('🔄 watchArticles triggered with ${articles.length} articles');
       if (isProcessing) return;
 
       isProcessing = true;
@@ -42,7 +42,7 @@ class CrawlerService {
 
       // Run grouping on main isolate (no compute needed)
       final grouped = scoreService.groupArticlesIncremental([], articles);
-      print('📍 Grouping complete: ${grouped.length} stories');
+      // print('📍 Grouping complete: ${grouped.length} stories');
 
       // Deduplicate articles within each story
       for (var story in grouped) {
@@ -58,8 +58,8 @@ class CrawlerService {
       // Remove empty stories
       grouped.removeWhere((story) => story.articles.isEmpty);
 
-      final totalArticles = grouped.fold<int>(0, (sum, s) => sum + s.articles.length);
-      print('📍 After deduplication: ${grouped.length} stories with $totalArticles total articles');
+      // final totalArticles = grouped.fold<int>(0, (sum, s) => sum + s.articles.length);
+      // print('📍 After deduplication: ${grouped.length} stories with $totalArticles total articles');
 
       await cache.save(grouped);
 

@@ -60,18 +60,16 @@ class ScoreService {
     final inferredCategories = _inferCategoriesFromContent(story);
 
     // 3. Remove inferred categories that already exist in article categories
-    final uniqueInferred = inferredCategories
-        .where((cat) => !articleCategories.contains(cat))
-        .toList();
+    final uniqueInferred =
+        inferredCategories
+            .where((cat) => !articleCategories.contains(cat))
+            .toList();
 
     // 4. Assign to story
-    story.storyTypes = articleCategories.isEmpty
-        ? ['General']
-        : articleCategories.toList();
+    story.storyTypes =
+        articleCategories.isEmpty ? ['General'] : articleCategories.toList();
 
-    story.inferredStoryTypes = uniqueInferred.isEmpty
-        ? null
-        : uniqueInferred;
+    story.inferredStoryTypes = uniqueInferred.isEmpty ? null : uniqueInferred;
   }
 
   /// Infer categories from story content using keyword matching
@@ -86,8 +84,8 @@ class ScoreService {
 
     // Normalize Romanian diacritics
     final normalizedText = text.replaceAllMapped(RegExp(r'[ăâîșțĂÂÎȘȚ]'), (
-        match,
-        ) {
+      match,
+    ) {
       final char = match.group(0)!.toLowerCase();
       switch (char) {
         case 'ă':
@@ -129,7 +127,7 @@ class ScoreService {
 
       // Sort keywords by length (longest first) to prioritize multi-word phrases
       final sortedKeywords =
-      entry.value.toList()..sort((a, b) => b.length.compareTo(a.length));
+          entry.value.toList()..sort((a, b) => b.length.compareTo(a.length));
 
       // Use a Set to avoid counting the same keyword twice
       final matchedKeywords = <String>{};
@@ -151,10 +149,11 @@ class ScoreService {
     final threshold = 1;
 
     // Get all categories that meet the threshold, sorted by score
-    final matchingTypes = categoryScores.entries
-        .where((entry) => entry.value >= threshold)
-        .toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final matchingTypes =
+        categoryScores.entries
+            .where((entry) => entry.value >= threshold)
+            .toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
 
     // Return the category names
     return matchingTypes.map((e) => e.key).toList();
@@ -162,16 +161,17 @@ class ScoreService {
 
   List<NewsStory> groupArticles(List<Article> articles) {
     final List<NewsStory> stories = [];
-    final Set<String> processedUrls = {}; // Track which articles we've already placed
-    int duplicateUrls = 0;
+    final Set<String> processedUrls =
+        {}; // Track which articles we've already placed
+    // int duplicateUrls = 0;
 
-    print('🔍 Starting grouping with ${articles.length} input articles');
+    // print('🔍 Starting grouping with ${articles.length} input articles');
 
     for (final article in articles) {
       // Skip if already processed
       if (processedUrls.contains(article.url)) {
-        duplicateUrls++;
-        print('⚠️ Duplicate URL skipped: ${article.url}');
+        // duplicateUrls++;
+        // print('⚠️ Duplicate URL skipped: ${article.url}');
         continue;
       }
 
@@ -186,7 +186,9 @@ class ScoreService {
         // Group if similar enough (regardless of source)
         if (similarity >= 0.30) {
           // Check if this exact URL is already in the story
-          final alreadyInStory = story.articles.any((a) => a.url == article.url);
+          final alreadyInStory = story.articles.any(
+            (a) => a.url == article.url,
+          );
 
           if (!alreadyInStory) {
             story.articles.add(article);
@@ -203,7 +205,7 @@ class ScoreService {
             break;
           } else {
             // It's a duplicate URL, mark as processed but don't add
-            duplicateUrls++;
+            // duplicateUrls++;
             added = true;
             break;
           }
@@ -215,7 +217,7 @@ class ScoreService {
         stories.add(
           NewsStory(
             canonicalTitle: article.title,
-            summary: article.description ?? '',
+            summary: article.description,
             articles: [article],
             storyTypes: null,
             imageUrl: article.urlToImage,
@@ -232,32 +234,34 @@ class ScoreService {
           story.articles
               .firstWhere(
                 (a) => a.description.isNotEmpty,
-            orElse: () => story.articles.first,
-          )
-              .description ??
-              '';
+                orElse: () => story.articles.first,
+              )
+              .description;
 
       // Categorize story (sets both storyTypes and inferredStoryTypes)
       categorizeStory(story);
     }
 
-    final totalArticlesInStories = stories.fold<int>(0, (sum, story) => sum + story.articles.length);
+    // final totalArticlesInStories = stories.fold<int>(
+    //   0,
+    //   (sum, story) => sum + story.articles.length,
+    // );
 
-    print('📊 Grouping complete:');
-    print('  - Input: ${articles.length} articles');
-    print('  - Output: ${stories.length} stories');
-    print('  - Articles in stories: $totalArticlesInStories');
-    print('  - Unique URLs processed: ${processedUrls.length}');
-    print('  - Duplicate URLs skipped: $duplicateUrls');
-    print('  - Missing: ${articles.length - totalArticlesInStories - duplicateUrls}');
+    // print('📊 Grouping complete:');
+    // print('  - Input: ${articles.length} articles');
+    // print('  - Output: ${stories.length} stories');
+    // print('  - Articles in stories: $totalArticlesInStories');
+    // print('  - Unique URLs processed: ${processedUrls.length}');
+    // print('  - Duplicate URLs skipped: $duplicateUrls');
+    // print('  - Missing: ${articles.length - totalArticlesInStories - duplicateUrls}');
 
     return stories;
   }
 
   List<NewsStory> groupArticlesIncremental(
-      List<NewsStory> existing,
-      List<Article> newArticles,
-      ) {
+    List<NewsStory> existing,
+    List<Article> newArticles,
+  ) {
     // 1️⃣ Convert existing canonicalTitles to a set
     final existingTitles = existing.map((s) => s.canonicalTitle).toSet();
 
@@ -273,7 +277,7 @@ class ScoreService {
       } else {
         // Merge new articles into existing story
         final idx = merged.indexWhere(
-              (s) => s.canonicalTitle == story.canonicalTitle,
+          (s) => s.canonicalTitle == story.canonicalTitle,
         );
         merged[idx].articles.addAll(story.articles);
       }

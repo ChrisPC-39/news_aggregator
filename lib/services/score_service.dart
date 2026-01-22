@@ -38,7 +38,7 @@ class ScoreService {
 
     double score = (titleTitle * 0.7) + (titleDesc * 0.3);
 
-    // Penalize same source
+    // Penalize same source (but don't make it 0)
     if (a.sourceName == b.sourceName) {
       score *= 0.5;
     }
@@ -46,7 +46,36 @@ class ScoreService {
     return score;
   }
 
-  List<String> inferStoryTypes(NewsStory story) {
+  /// Extract categories from articles and infer additional ones
+  void categorizeStory(NewsStory story) {
+    // 1. Get categories directly from articles
+    final articleCategories = <String>{};
+    for (final article in story.articles) {
+      if (article.category != null && article.category!.isNotEmpty) {
+        articleCategories.add(article.category!);
+      }
+    }
+
+    // 2. Infer categories from content using keyword matching
+    final inferredCategories = _inferCategoriesFromContent(story);
+
+    // 3. Remove inferred categories that already exist in article categories
+    final uniqueInferred = inferredCategories
+        .where((cat) => !articleCategories.contains(cat))
+        .toList();
+
+    // 4. Assign to story
+    story.storyTypes = articleCategories.isEmpty
+        ? ['General']
+        : articleCategories.toList();
+
+    story.inferredStoryTypes = uniqueInferred.isEmpty
+        ? null
+        : uniqueInferred;
+  }
+
+  /// Infer categories from story content using keyword matching
+  List<String> _inferCategoriesFromContent(NewsStory story) {
     // Combine all relevant text (already lowercased)
     final text = [
       story.canonicalTitle.toLowerCase(),
@@ -57,8 +86,8 @@ class ScoreService {
 
     // Normalize Romanian diacritics
     final normalizedText = text.replaceAllMapped(RegExp(r'[ăâîșțĂÂÎȘȚ]'), (
-      match,
-    ) {
+        match,
+        ) {
       final char = match.group(0)!.toLowerCase();
       switch (char) {
         case 'ă':
@@ -100,7 +129,7 @@ class ScoreService {
 
       // Sort keywords by length (longest first) to prioritize multi-word phrases
       final sortedKeywords =
-          entry.value.toList()..sort((a, b) => b.length.compareTo(a.length));
+      entry.value.toList()..sort((a, b) => b.length.compareTo(a.length));
 
       // Use a Set to avoid counting the same keyword twice
       final matchedKeywords = <String>{};
@@ -122,96 +151,118 @@ class ScoreService {
     final threshold = 1;
 
     // Get all categories that meet the threshold, sorted by score
-    final matchingTypes =
-        categoryScores.entries
-            .where((entry) => entry.value >= threshold)
-            .toList()
-          ..sort((a, b) => b.value.compareTo(a.value));
+    final matchingTypes = categoryScores.entries
+        .where((entry) => entry.value >= threshold)
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
-    // Return the category names, or ['General'] if none match
-    if (matchingTypes.isEmpty) {
-      return ['General'];
-    }
-
+    // Return the category names
     return matchingTypes.map((e) => e.key).toList();
   }
 
   List<NewsStory> groupArticles(List<Article> articles) {
     final List<NewsStory> stories = [];
+    final Set<String> processedUrls = {}; // Track which articles we've already placed
+    int duplicateUrls = 0;
+
+    print('🔍 Starting grouping with ${articles.length} input articles');
 
     for (final article in articles) {
+      // Skip if already processed
+      if (processedUrls.contains(article.url)) {
+        duplicateUrls++;
+        print('⚠️ Duplicate URL skipped: ${article.url}');
+        continue;
+      }
+
       bool added = false;
 
       for (final story in stories) {
         final representative = story.articles.first;
 
-        if (similarityScore(article, representative) >= 0.30 &&
-            representative.sourceName != article.sourceName) {
-          story.articles.add(article);
+        // Check similarity
+        final similarity = similarityScore(article, representative);
 
-          // Pick a representative image if not set
-          if (story.imageUrl == null &&
-              article.urlToImage != null &&
-              article.urlToImage!.isNotEmpty) {
-            story.imageUrl = article.urlToImage;
+        // Group if similar enough (regardless of source)
+        if (similarity >= 0.30) {
+          // Check if this exact URL is already in the story
+          final alreadyInStory = story.articles.any((a) => a.url == article.url);
+
+          if (!alreadyInStory) {
+            story.articles.add(article);
+            processedUrls.add(article.url);
+
+            // Pick a representative image if not set
+            if (story.imageUrl == null &&
+                article.urlToImage != null &&
+                article.urlToImage!.isNotEmpty) {
+              story.imageUrl = article.urlToImage;
+            }
+
+            added = true;
+            break;
+          } else {
+            // It's a duplicate URL, mark as processed but don't add
+            duplicateUrls++;
+            added = true;
+            break;
           }
-
-          added = true;
-          break;
         }
       }
 
       if (!added) {
-        final storyType = article.category == null ? null : [article.category!];
-
+        // Create new story for this article
         stories.add(
           NewsStory(
             canonicalTitle: article.title,
-            summary: article.description,
+            summary: article.description ?? '',
             articles: [article],
-            storyTypes: storyType,
+            storyTypes: null,
             imageUrl: article.urlToImage,
           ),
         );
+        processedUrls.add(article.url);
       }
     }
 
-    // After grouping, update summary and infer story types for each story
+    // After grouping, update summary and categorize each story
     for (final story in stories) {
       // Pick first non-empty description among all grouped articles
       story.summary =
           story.articles
               .firstWhere(
                 (a) => a.description.isNotEmpty,
-                orElse: () => story.articles.first,
-              )
-              .description;
+            orElse: () => story.articles.first,
+          )
+              .description ??
+              '';
 
-      // Normalize existing story types for comparison
-      final existingTypes =
-          story.storyTypes?.map((t) => t.toLowerCase()).toSet() ?? {};
-
-      final inferred = inferStoryTypes(story)
-          .map((e) => e.toLowerCase())
-          .toSet()
-          .difference(existingTypes)
-          .toList();
-
-      story.inferredStoryTypes = inferred.isEmpty ? null : inferred;
+      // Categorize story (sets both storyTypes and inferredStoryTypes)
+      categorizeStory(story);
     }
+
+    final totalArticlesInStories = stories.fold<int>(0, (sum, story) => sum + story.articles.length);
+
+    print('📊 Grouping complete:');
+    print('  - Input: ${articles.length} articles');
+    print('  - Output: ${stories.length} stories');
+    print('  - Articles in stories: $totalArticlesInStories');
+    print('  - Unique URLs processed: ${processedUrls.length}');
+    print('  - Duplicate URLs skipped: $duplicateUrls');
+    print('  - Missing: ${articles.length - totalArticlesInStories - duplicateUrls}');
 
     return stories;
   }
 
   List<NewsStory> groupArticlesIncremental(
-    List<NewsStory> existing,
-    List<Article> newArticles,
-  ) {
+      List<NewsStory> existing,
+      List<Article> newArticles,
+      ) {
     // 1️⃣ Convert existing canonicalTitles to a set
     final existingTitles = existing.map((s) => s.canonicalTitle).toSet();
 
     // 2️⃣ Group only new articles
-    final newStories = groupArticles(newArticles); // reuse your normal grouping
+    final newStories = groupArticles(newArticles);
 
     // 3️⃣ Merge
     final merged = [...existing];
@@ -220,9 +271,9 @@ class ScoreService {
       if (!existingTitles.contains(story.canonicalTitle)) {
         merged.add(story);
       } else {
-        // Optional: merge new articles into existing story
+        // Merge new articles into existing story
         final idx = merged.indexWhere(
-          (s) => s.canonicalTitle == story.canonicalTitle,
+              (s) => s.canonicalTitle == story.canonicalTitle,
         );
         merged[idx].articles.addAll(story.articles);
       }

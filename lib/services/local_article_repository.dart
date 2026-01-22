@@ -10,14 +10,17 @@ class LocalArticleRepository {
 
   /// Save articles to Hive (replaces Firebase sync)
   Future<void> saveArticles(List<Article> articles) async {
-    await _box.clear(); // Clear old articles
+    // Disable auto-compact during bulk operation
+    await _box.clear();
 
-    for (var article in articles) {
-      await _box.add(ArticleHive.fromArticle(article));
+    // Use putAll for bulk insert (triggers watch only once)
+    final articlesMap = <int, ArticleHive>{};
+    for (int i = 0; i < articles.length; i++) {
+      articlesMap[i] = ArticleHive.fromArticle(articles[i]);
     }
+    await _box.putAll(articlesMap);
   }
 
-  /// Get all articles as a list
   List<Article> getArticles() {
     return _box.values.map((e) => e.toArticle()).toList();
   }

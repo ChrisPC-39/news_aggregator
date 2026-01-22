@@ -104,9 +104,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
             child:
                 _isLoading
                     ? LinearProgressIndicator(
-                      backgroundColor: Colors.white.withOpacity(0.2),
+                      backgroundColor: Colors.white.withValues(alpha:0.2),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withOpacity(0.8),
+                        Colors.white.withValues(alpha: 0.8),
                       ),
                     )
                     : const SizedBox.shrink(),

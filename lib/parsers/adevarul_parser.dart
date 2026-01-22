@@ -11,7 +11,7 @@ class AdevarulParser {
     'https://adevarul.ro/stiri-externe': 'World',
     'https://adevarul.ro/politica': 'Politică internă',
     'https://adevarul.ro/economie': 'Business',
-    'https://adevarul.ro/sport': 'Sport',
+    // 'https://adevarul.ro/sport': 'Sport',
     'https://adevarul.ro/stil-de-viata': null,
   };
 

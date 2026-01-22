@@ -8,8 +8,8 @@ import '../models/news_story_model.dart';
 import '../parsers/adevarul_parser.dart';
 import '../parsers/digi24_parser.dart';
 import '../parsers/tvr_info_parser.dart';
-import 'firebase_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
+import 'local_article_repository.dart';
 
 // Top-level function for isolate
 class _GroupingParams {
@@ -28,7 +28,8 @@ List<NewsStory> _groupArticlesInIsolate(_GroupingParams params) {
 }
 
 class CrawlerService {
-  final repo = FirebaseArticleRepository();
+  // final repo = FirebaseArticleRepository();
+  final localRepo = LocalArticleRepository();
   final scoreService = ScoreService();
   final GroupedStoriesCacheService cache = GroupedStoriesCacheService();
 
@@ -38,27 +39,25 @@ class CrawlerService {
 
   /// Watch Firestore and return cached + updated grouped stories
   Stream<List<NewsStory>> watchGroupedStories() {
-    // 1️⃣ Load initial cached stories
+    print('📍 watchGroupedStories called');
     final initialStories = cache.load();
-
-    // 2️⃣ StreamController with initial data
     final controller = StreamController<List<NewsStory>>();
     controller.add(initialStories);
 
-    // 3️⃣ Listen to Firestore in background
-    repo.watchArticles().listen((articles) async {
-      // Notify that processing has started
+    bool isProcessing = false; // Prevent re-entry
+
+    localRepo.watchArticles().listen((articles) async {
+      print('🔄 watchArticles triggered with ${articles.length} articles');
+      if (isProcessing) return; // Skip if already processing
+
+      isProcessing = true;
       _processingController.add(true);
 
-      // Note: No need to call removeDuplicateArticles here
-      // The repository already handles deduplication across all batches
-
-      // ✅ Run heavy computation in background isolate
-      // Pass EMPTY list as initialStories to avoid duplicating cached data
       final grouped = await compute(
         _groupArticlesInIsolate,
-        _GroupingParams([], articles), // Changed from initialStories to []
+        _GroupingParams([], articles),
       );
+      print('📍 Grouping complete: ${grouped.length} stories');
 
       // Deduplicate articles within each story
       for (var story in grouped) {
@@ -71,51 +70,45 @@ class CrawlerService {
         });
       }
 
-      // Update Hive cache
       await cache.save(grouped);
+      print('📍 Cache saved');
 
-      // Emit updated stream
       if (!controller.isClosed) {
         controller.add(grouped);
       }
 
-      // Notify that processing is complete
       _processingController.add(false);
+      isProcessing = false;
     });
 
     return controller.stream;
   }
 
-  /// Fetch all sources and sync to Firestore
-  /// The repository handles deduplication and batch management
   Future<void> fetchAllSources() async {
     List<Article> allArticles = [];
-    for (var url in Globals.sourceConfigs.values) {
+    for (var url in Globals.sourceConfigs.keys) {
       final siteArticles = await crawlSite(url);
       allArticles.addAll(siteArticles);
     }
 
-    // Repository will handle:
-    // - Checking for duplicates across all batches
-    // - Updating existing articles if content changed
-    // - Adding new articles to batch_0
-    // - Rotating batches if needed
-    await repo.syncArticles(allArticles);
+    print(allArticles.length);
+    // Changed: Save to local Hive instead of Firebase
+    await localRepo.saveArticles(allArticles);
   }
 
   Future<List<Article>> crawlSite(String url) async {
     try {
-      if (url.contains('digi24.ro')) {
+      if (url.toLowerCase().contains('digi24')) {
         final digi24Parser = Digi24Parser();
         return await digi24Parser.parse();
       }
 
-      if (url.contains('adevarul.ro')) {
+      if (url.toLowerCase().contains('adevarul')) {
         final adevaruParser = AdevarulParser();
         return await adevaruParser.parse();
       }
 
-      if (url.contains('tvrinfo.ro')) {
+      if (url.toLowerCase().contains('tvrinfo')) {
         final tvrinfoParser = TvrInfoParser();
         return await tvrinfoParser.parse();
       }

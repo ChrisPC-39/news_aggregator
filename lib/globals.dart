@@ -1,34 +1,49 @@
 class Globals {
-  // static final allSources = [
-  //   "Adevarul", "HotNews", "Libertatea",
-  //   "Digi24", "TVRInfo", "RomaniaTV", "Antena3"
-  // ];
-  // static final allSources = [
-  //   "Adevarul",
-  //   "Digi24",
-  //   "TVRInfo",
-  // ];
-
   static final Map<String, String> sourceConfigs = {
     "Adevarul": "https://adevarul.ro/",
     "Digi24": "https://www.digi24.ro/",
     "TVRInfo": "https://tvrinfo.ro/",
-    "HotNews": "https://hotnews.ro/",
-    "Libertatea": "https://www.libertatea.ro/",
-    "RomaniaTV": "https://www.romaniatv.net/",
-    "Antena3": "https://www.antena3.ro/",
-  };
 
-  // 'https://stirileprotv.ro/ultimele-stiri/', // Not working due to dynamically loaded JS content
-  // static List<String> urls = [
-  //   'https://adevarul.ro/',
-  //   'https://www.digi24.ro/',
-  //   'https://tvrinfo.ro/',
-  //   'https://hotnews.ro/',
-  //   'https://www.libertatea.ro/',
-  //   'https://www.romaniatv.net/',
-  //   'https://www.antena3.ro/',
-  // ];
+    // "HotNews": "https://hotnews.ro/",
+    // "Libertatea": "https://www.libertatea.ro/",
+    // "RomaniaTV": "https://www.romaniatv.net/",
+    // "Antena3": "https://www.antena3.ro/",
+
+    // Good to go:
+    // "stiripesurse": "https://www.stiripesurse.ro/",
+    // "Agerpres": "https://agerpres.ro/",
+    // "EuropaLibera": "https://romania.europalibera.org/", //https://romania.europalibera.org/stiri
+    // "DCnews": "https://www.dcnews.ro/",
+    // "G4media": "https://www.g4media.ro/", //green news + main page
+    // "Profit": "https://www.profit.ro/", //stiri/politica si economie
+    // "GreenNews": "https://greennews.ro/", //https://greennews.ro/stiri/
+    // "economica.ro": "https://www.economica.net/",
+    // "ForbesRomania": "https://www.forbes.ro/", //https://www.forbes.ro/actualitate
+    // "CursdeGuvernare": "https://cursdeguvernare.ro/", //https://cursdeguvernare.ro/cat/stiri-2
+    // "Retail-FMCG": "https://www.retail-fmcg.ro/",
+    // "Juridice.ro": "https://www.juridice.ro/", //https://www.juridice.ro/flux-informatii
+    // "RevistaProgresiv": "https://revistaprogresiv.ro/", //https://revistaprogresiv.ro/retail/
+    // "euractiv": "https://www.euractiv.ro/",
+    // "Retail.ro": "https://www.retail.ro/",
+
+    //VERIFY
+    // "RevistaBIZ": "https://www.revistabiz.ro/",
+    // "360medical.ro": "https://www.360medical.ro/",
+    // "MedicalNews": "https://www.medicalnews.ro/",
+    // "UniversulJuridic.ro": "https://www.universuljuridic.ro/",
+    // "Edupedu": "https://www.edupedu.ro/",
+
+    // Dynamic, can't scrape
+    // "WallStreetRomania": "https://www.wall-street.ro/",
+    // "EuroNews": "https://www.euronews.ro/", //RSS Feed only for global feed
+
+
+
+    // Site is not ok (missing bunch of info or hard to read)
+    // "avocatnet.ro": "https://www.avocatnet.ro/",
+    // "ZiarulFinanciar": "https://www.zf.ro/",
+    // "rfi": "https://www.rfi.fr/ro/", //romania, europa, international
+  };
 
   static Map<String, List<String>> storyTypeKeywords = {
     'General' : [],
@@ -447,7 +462,6 @@ class Globals {
       // Exclude business/economic summits
       'forum economic', 'summit economic', 'davos',
     ],
-
     'World': [
       // Exclude Romanian internal politics
       'guvernul romaniei', 'parlamentul romaniei', 'presedintele romaniei',

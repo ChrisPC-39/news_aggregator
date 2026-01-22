@@ -16,79 +16,79 @@ import 'grouped_stories_cache_service.dart';
 
 class CrawlerService {
   final localRepo = LocalArticleRepository();
-  // final repo = FirebaseArticleRepository();
   final scoreService = ScoreService();
   final GroupedStoriesCacheService cache = GroupedStoriesCacheService();
 
   // StreamController to notify when processing is complete
   final _processingController = StreamController<bool>.broadcast();
+
   Stream<bool> get isProcessing => _processingController.stream;
 
-  /// Watch Firestore and return cached + updated grouped stories
   Stream<List<NewsStory>> watchGroupedStories() {
-    // print('📍 watchGroupedStories called');
-    final initialStories = cache.load();
     final controller = StreamController<List<NewsStory>>();
+
+    // Load from cache once
+    final initialStories = cache.load();
     controller.add(initialStories);
-
-    bool isProcessing = false;
-
-    localRepo.watchArticles().listen((articles) async {
-      // print('🔄 watchArticles triggered with ${articles.length} articles');
-      if (isProcessing) return;
-
-      isProcessing = true;
-      _processingController.add(true);
-
-      // Run grouping on main isolate (no compute needed)
-      final grouped = scoreService.groupArticlesIncremental([], articles);
-      // print('📍 Grouping complete: ${grouped.length} stories');
-
-      // Deduplicate articles within each story
-      for (var story in grouped) {
-        final seen = <String>{};
-        story.articles.retainWhere((article) {
-          final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
-          if (seen.contains(key)) return false;
-          seen.add(key);
-          return true;
-        });
-      }
-
-      // Remove empty stories
-      grouped.removeWhere((story) => story.articles.isEmpty);
-
-      // final totalArticles = grouped.fold<int>(0, (sum, s) => sum + s.articles.length);
-      // print('📍 After deduplication: ${grouped.length} stories with $totalArticles total articles');
-
-      await cache.save(grouped);
-
-      if (!controller.isClosed) {
-        controller.add(grouped);
-      }
-
-      _processingController.add(false);
-      isProcessing = false;
-    });
 
     return controller.stream;
   }
 
-  /// Fetch all sources and sync to Firestore
-  /// The repository handles deduplication and batch management
-  Future<void> fetchAllSources() async {
-    List<Article> allArticles = [];
-    for (var url in Globals.sourceConfigs.values) {
-      final siteArticles = await crawlSite(url);
-      allArticles.addAll(siteArticles);
-    }
+  Future<void> refreshStories() async {
+    final articles = localRepo.getArticles();
 
-    // Repository will handle:
-    // - Checking for duplicates across all batches
-    // - Updating existing articles if content changed
-    // - Adding new articles to batch_0
-    // - Rotating batches if needed
+    final grouped = scoreService.groupArticlesIncremental([], articles);
+
+    // Deduplication
+    for (var story in grouped) {
+      final seen = <String>{};
+      story.articles.retainWhere((article) {
+        final key =
+            '${article.sourceName}::${article.title.trim().toLowerCase()}';
+        if (seen.contains(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    grouped.removeWhere((story) => story.articles.isEmpty);
+
+    await cache.save(grouped);
+    _processingController.add(false);
+  }
+
+  /// Fetch all sources and sync to local storage
+  Future<void> fetchAllSources() async {
+    final totalStopwatch = Stopwatch()..start();
+    print('\n🚀 Starting fetchAllSources (parallel)...\n');
+
+    // Crawl all sources in parallel
+    final futures =
+        Globals.sourceConfigs.values.map((url) async {
+          final siteStopwatch = Stopwatch()..start();
+          final articles = await crawlSite(url);
+          siteStopwatch.stop();
+
+          final domain = Uri.parse(url).host.replaceFirst('www.', '');
+          print(
+            '  ⏱️  $domain: ${articles.length} articles in ${siteStopwatch.elapsedMilliseconds}ms',
+          );
+          return articles;
+        }).toList();
+
+    final results = await Future.wait(futures);
+    final allArticles = results.expand((list) => list).toList();
+
+    print('\n📊 Total articles crawled: ${allArticles.length}');
+
+    final saveStopwatch = Stopwatch()..start();
     await localRepo.saveArticles(allArticles);
+    saveStopwatch.stop();
+
+    totalStopwatch.stop();
+    print('  ⏱️  Saving to Hive: ${saveStopwatch.elapsedMilliseconds}ms');
+    print(
+      '✅ Total crawl time: ${totalStopwatch.elapsedMilliseconds}ms (${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)\n',
+    );
   }
 
   Future<List<Article>> crawlSite(String url) async {
@@ -115,7 +115,7 @@ class CrawlerService {
         Uri.parse(url),
         headers: {
           'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
       );
 
@@ -145,18 +145,19 @@ class CrawlerService {
 
       return _removeDuplicatesInList(articles);
     } catch (e) {
+      print('  ❌ Error crawling $url: $e');
       return [];
     }
   }
 
   /// Helper to remove duplicates within a single list
-  /// (Not across batches - that's handled by the repository)
   List<Article> _removeDuplicatesInList(List<Article> articles) {
     final seen = <String>{};
     final uniqueArticles = <Article>[];
 
     for (var article in articles) {
-      final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+      final key =
+          '${article.sourceName}::${article.title.trim().toLowerCase()}';
       if (!seen.contains(key)) {
         seen.add(key);
         uniqueArticles.add(article);
@@ -182,13 +183,13 @@ class CrawlerService {
             article.querySelector('a.entry-excerpt')?.text.trim() ?? '';
 
         final imageUrl =
-        article
-            .querySelector('figure.post-thumbnail img')
-            ?.attributes['src'];
+            article
+                .querySelector('figure.post-thumbnail img')
+                ?.attributes['src'];
 
         DateTime publishedAt = DateTime.now();
         final datetimeAttr =
-        article.querySelector('time.entry-date')?.attributes['datetime'];
+            article.querySelector('time.entry-date')?.attributes['datetime'];
 
         if (datetimeAttr != null) {
           publishedAt = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
@@ -202,57 +203,6 @@ class CrawlerService {
             urlToImage: imageUrl,
             publishedAt: publishedAt,
             sourceName: 'HotNews',
-          ),
-        );
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return articles;
-  }
-
-  List<Article> parseDigi24(Document document) {
-    final List<Article> articles = [];
-    final articleNodes = document.querySelectorAll('article.article');
-
-    for (final article in articleNodes) {
-      try {
-        final titleAnchor = article.querySelector('.article-title a');
-        final title = titleAnchor?.text.trim() ?? '';
-        final relativeLink = titleAnchor?.attributes['href'];
-
-        if (title.isEmpty || relativeLink == null) continue;
-
-        final url =
-        relativeLink.startsWith('http')
-            ? relativeLink
-            : 'https://www.digi24.ro$relativeLink';
-
-        final description =
-            article.querySelector('.article-intro')?.text.trim() ?? '';
-
-        final imageUrl =
-        article
-            .querySelector('figure.article-thumb img')
-            ?.attributes['src'];
-
-        DateTime publishedAt = DateTime.now();
-        final datetimeAttr =
-        article.querySelector('time')?.attributes['datetime'];
-
-        if (datetimeAttr != null) {
-          publishedAt = DateTime.tryParse(datetimeAttr) ?? DateTime.now();
-        }
-
-        articles.add(
-          Article(
-            title: title,
-            description: description,
-            url: url,
-            urlToImage: imageUrl,
-            publishedAt: publishedAt,
-            sourceName: 'Digi24',
           ),
         );
       } catch (_) {
@@ -296,68 +246,6 @@ class CrawlerService {
     return articles;
   }
 
-  List<Article> parseTvrInfo(Document document) {
-    List<Article> articles = [];
-    var articleElements = document.querySelectorAll('div.article');
-
-    for (var element in articleElements) {
-      try {
-        var linkElement = element.querySelector('a.article__link');
-        var titleElement = element.querySelector('h2.article__title');
-        if (linkElement == null || titleElement == null) continue;
-
-        String title = titleElement.text.trim();
-        String url = linkElement.attributes['href'] ?? '';
-        if (url.isEmpty) continue;
-
-        String description =
-            element.querySelector('.article__excerpt')?.text.trim() ?? '';
-
-        DateTime publishedAt = DateTime.now();
-        var dateText =
-        element.querySelector('p.article__meta-data')?.text.trim();
-        if (dateText != null) {
-          try {
-            var dateMatch = RegExp(
-              r'(\d{1,2} \w+ \d{4}), (\d{2}:\d{2})',
-            ).firstMatch(dateText);
-            if (dateMatch != null) {
-              publishedAt = parseTVRDate(
-                '${dateMatch.group(1)} ${dateMatch.group(2)}',
-              );
-            }
-          } catch (_) {}
-        }
-
-        String? mediaUrl;
-        var img =
-            element.querySelector('.slider__slide-inner img') ??
-                element.querySelector('.article__thumbnail');
-        var iframe = element.querySelector('.slider__slide-inner iframe');
-        if (img != null) {
-          mediaUrl = img.attributes['src'];
-        } else if (iframe != null) {
-          mediaUrl = iframe.attributes['data-src'];
-        }
-
-        articles.add(
-          Article(
-            title: title,
-            url: url,
-            description: description,
-            urlToImage: mediaUrl,
-            publishedAt: publishedAt,
-            sourceName: 'TVRInfo',
-          ),
-        );
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return articles;
-  }
-
   List<Article> parseRomaniaTV(Document document) {
     final List<Article> articles = [];
     final articleBlocks = document.querySelectorAll('.article');
@@ -366,8 +254,8 @@ class CrawlerService {
       try {
         var titleAnchor =
             item.querySelector('h2 a') ??
-                item.querySelector('.article__title a') ??
-                item.querySelector('a');
+            item.querySelector('.article__title a') ??
+            item.querySelector('a');
         if (titleAnchor == null) continue;
 
         final title = titleAnchor.text.trim();
@@ -376,8 +264,8 @@ class CrawlerService {
 
         final description =
             item.querySelector('.article__excerpt')?.text.trim() ??
-                item.querySelector('p')?.text.trim() ??
-                '';
+            item.querySelector('p')?.text.trim() ??
+            '';
 
         String? imageUrl;
         final imgTag = item.querySelector('img');
@@ -387,8 +275,8 @@ class CrawlerService {
 
         final timeText =
             item.querySelector('time')?.text.trim() ??
-                item.querySelector('.article__meta-data')?.text.trim() ??
-                '';
+            item.querySelector('.article__meta-data')?.text.trim() ??
+            '';
         DateTime publishedAt = DateTime.now();
         if (timeText.isNotEmpty) {
           final match = RegExp(

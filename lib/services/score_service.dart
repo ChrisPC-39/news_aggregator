@@ -33,6 +33,11 @@ class ScoreService {
   }
 
   double similarityScore(Article a, Article b) {
+    // Quick reject: if titles share <2 words, skip expensive calculation
+    final wordsA = normalize(a.title).split(' ').toSet();
+    final wordsB = normalize(b.title).split(' ').toSet();
+    if (wordsA.intersection(wordsB).length < 2) return 0;
+
     final titleTitle = tokenOverlap(a.title, b.title);
     final titleDesc = tokenOverlap(a.title, b.description);
 

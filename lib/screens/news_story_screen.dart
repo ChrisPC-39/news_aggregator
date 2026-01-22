@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // For compute()
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../globals.dart';
 import '../models/news_story_model.dart';
+import '../models/article_model.dart';
 import '../services/crawler_service.dart';
+import '../services/score_service.dart';
 import '../widgets/FloatingSearchAndFilter.dart';
 import 'grouped_news_screen.dart';
 
@@ -28,24 +31,101 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   Set<String> selectedCategories = {};
   int minimumSources = 2;
   Set<String> selectedSources =
-      Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
+  Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
 
-  late Stream<List<NewsStory>> _storiesStream;
-  bool _isLoading = true; // Track loading state
+  // Direct state instead of stream
+  List<NewsStory> _stories = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _crawlerService.fetchAllSources();
     _scrollController.addListener(_onScroll);
-    _storiesStream = _crawlerService.watchGroupedStories().asBroadcastStream();
-    //
-    // Listen to processing status from CrawlerService
+
+    // Load initial cached stories synchronously
+    _stories = _crawlerService.cache.load();
+
+    // Listen to processing status
     _crawlerService.isProcessing.listen((isProcessing) {
       if (mounted) {
         setState(() => _isLoading = isProcessing);
       }
     });
+
+    // Fetch and refresh in background
+    _refreshNews();
+  }
+
+  Future<void> _refreshNews() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Fetch all sources (parallel)
+      await _crawlerService.fetchAllSources();
+
+      // Get articles
+      final articles = _crawlerService.localRepo.getArticles();
+
+      print('🔄 Starting grouping for ${articles.length} articles...');
+
+      // Run grouping in isolate to prevent UI freeze
+      final grouped = await _groupArticlesInBackground(articles);
+
+      print('✅ Grouping complete: ${grouped.length} stories');
+
+      // Save to cache
+      await _crawlerService.cache.save(grouped);
+
+      // Update UI
+      if (mounted) {
+        setState(() {
+          _stories = grouped;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error refreshing news: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Run grouping in background isolate
+  Future<List<NewsStory>> _groupArticlesInBackground(List<Article> articles) async {
+    // Convert to JSON for serialization
+    final articlesJson = articles.map((a) => a.toJson()).toList();
+
+    // Run in isolate
+    final groupedJson = await compute(_groupArticlesIsolate, articlesJson);
+
+    // Convert back to objects
+    return groupedJson.map((json) => NewsStory.fromJson(json)).toList();
+  }
+
+  // Top-level function for isolate
+  static List<Map<String, dynamic>> _groupArticlesIsolate(List<Map<String, dynamic>> articlesJson) {
+    // Reconstruct articles from JSON
+    final articles = articlesJson.map((json) => Article.fromJson(json)).toList();
+
+    // Use ScoreService to group
+    final scoreService = ScoreService();
+    final grouped = scoreService.groupArticlesIncremental([], articles);
+
+    // Deduplicate
+    for (var story in grouped) {
+      final seen = <String>{};
+      story.articles.retainWhere((article) {
+        final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+        if (seen.contains(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    grouped.removeWhere((story) => story.articles.isEmpty);
+
+    // Convert to JSON for return
+    return grouped.map((story) => story.toJson()).toList();
   }
 
   void _onScroll() {
@@ -69,6 +149,8 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredStories = _applyAllFilters(_stories);
+
     return GestureDetector(
       onTap: () => _searchFocusNode.unfocus(),
       child: Scaffold(
@@ -77,108 +159,33 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
           backgroundColor: Theme.of(context).primaryColor,
           foregroundColor: Colors.white,
           actions: [
-            StreamBuilder<List<NewsStory>>(
-              stream: _storiesStream,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const SizedBox();
-
-                final displayed = _applyAllFilters(snapshot.data!).length;
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Text(
-                    '$displayed listed',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white60,
-                      fontSize: 14,
-                    ),
-                  ),
-                );
-              },
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Text(
+                '${filteredStories.length} listed',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white60,
+                  fontSize: 14,
+                ),
+              ),
             ),
           ],
-          // Add loading indicator at bottom of AppBar
           bottom: PreferredSize(
             preferredSize: Size.fromHeight(_isLoading ? 3 : 0),
-            child:
-                _isLoading
-                    ? LinearProgressIndicator(
-                      backgroundColor: Colors.white.withValues(alpha:0.2),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withValues(alpha: 0.8),
-                      ),
-                    )
-                    : const SizedBox.shrink(),
+            child: _isLoading
+                ? LinearProgressIndicator(
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Colors.white.withValues(alpha: 0.8),
+              ),
+            )
+                : const SizedBox.shrink(),
           ),
         ),
         body: Stack(
           children: [
-            StreamBuilder<List<NewsStory>>(
-              stream: _storiesStream,
-              builder: (context, snapshot) {
-                print('🎨 UI rebuilding');
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error: ${snapshot.error}',
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  );
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final stories = _applyAllFilters(snapshot.data!);
-
-                if (stories.isEmpty) {
-                  return Center(
-                    child:
-                        _searchQuery.isNotEmpty
-                            ? Text('No stories match "$_searchQuery"')
-                            : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text('No news found.'),
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                      _searchQuery = '';
-                                      selectedCategories.clear();
-                                      minimumSources = 1;
-                                      selectedSources =
-                                          Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
-                                    });
-                                  },
-                                  child: const Text('Clear filters'),
-                                ),
-                              ],
-                            ),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(
-                    top: 8,
-                    bottom: 80,
-                    left: 8,
-                    right: 8,
-                  ),
-                  itemCount: stories.length,
-                  itemBuilder: (context, index) {
-                    final story = stories[index];
-                    final sources =
-                        story.articles.map((a) => a.sourceName).toList();
-
-                    return buildNewsStoryCard(context, story, sources);
-                  },
-                );
-              },
-            ),
+            _buildBody(filteredStories),
             FloatingSearchAndFilter(
               selectedCategories: selectedCategories,
               selectedSources: selectedSources,
@@ -224,14 +231,67 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     );
   }
 
+  Widget _buildBody(List<NewsStory> stories) {
+    if (_stories.isEmpty && _isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (stories.isEmpty) {
+      return Center(
+        child: _searchQuery.isNotEmpty
+            ? Text('No stories match "$_searchQuery"')
+            : Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('No news found.'),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                  selectedCategories.clear();
+                  minimumSources = 1;
+                  selectedSources = Globals.sourceConfigs.keys
+                      .map((source) => source.toLowerCase())
+                      .toSet();
+                });
+              },
+              child: const Text('Clear filters'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshNews,
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.only(
+          top: 8,
+          bottom: 80,
+          left: 8,
+          right: 8,
+        ),
+        itemCount: stories.length,
+        itemBuilder: (context, index) {
+          final story = stories[index];
+          final sources = story.articles.map((a) => a.sourceName).toList();
+
+          return buildNewsStoryCard(context, story, sources);
+        },
+      ),
+    );
+  }
+
   // Centralized filtering logic
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
-      // 1. Source Filter (Check if story has at least one article from an active source)
+      // 1. Source Filter
       final storySourceIds =
-          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+      story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
       final hasActiveSource = storySourceIds.any(
-        (id) => selectedSources.contains(id),
+            (id) => selectedSources.contains(id),
       );
       if (!hasActiveSource) return false;
 
@@ -263,28 +323,22 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   Widget buildNewsStoryCard(
-    BuildContext context,
-    NewsStory story,
-    List<String> sources,
-  ) {
+      BuildContext context,
+      NewsStory story,
+      List<String> sources,
+      ) {
     final manualTypes = story.storyTypes ?? [];
     final aiTypes = story.inferredStoryTypes ?? [];
 
-    // Extract unique publisher assets and the date range
     final articles = story.articles;
 
-    // 1. Get unique source names/icons (e.g., 'digi24', 'pro-tv')
+    // Get unique source names
     final uniqueSources =
-        articles
-            .map(
-              (a) => a.sourceName,
-            ) // Or whatever field holds the source identifier
-            .toSet()
-            .toList();
+    articles.map((a) => a.sourceName).toSet().toList();
 
-    // 2. Find the earliest and latest dates
+    // Find date range
     final dates = articles.map((a) => a.publishedAt).toList();
-    dates.sort(); // Oldest to newest
+    dates.sort();
 
     final String dateDisplay;
 
@@ -294,14 +348,10 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       final firstDate = dates.first;
       final lastDate = dates.last;
 
-      // 1. If all articles are from the same day
       if (DateFormat('yyyyMMdd').format(firstDate) ==
           DateFormat('yyyyMMdd').format(lastDate)) {
-        // Show how long ago the most recent article was
         dateDisplay = timeago.format(lastDate);
-      }
-      // 2. If they span multiple days
-      else {
+      } else {
         final String firstDateStr = DateFormat('MMM d').format(firstDate);
         final String lastDateStr = DateFormat('MMM d').format(lastDate);
         dateDisplay = "$firstDateStr - $lastDateStr";
@@ -322,13 +372,11 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Wrap your image in a Stack
             SizedBox(
               width: double.infinity,
-              height:
-                  story.imageUrl != null && story.imageUrl!.isNotEmpty
-                      ? 200
-                      : 35,
+              height: story.imageUrl != null && story.imageUrl!.isNotEmpty
+                  ? 200
+                  : 35,
               child: Stack(
                 children: [
                   if (story.imageUrl != null && story.imageUrl!.isNotEmpty)
@@ -339,7 +387,6 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const SizedBox(),
                     ),
-                  // The Tag Overlay
                   if (manualTypes.isNotEmpty || aiTypes.isNotEmpty)
                     Positioned(
                       top: 12,
@@ -350,10 +397,10 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                         runSpacing: 6,
                         children: [
                           ...manualTypes.map(
-                            (type) => _buildTagChip(type, isAi: false),
+                                (type) => _buildTagChip(type, isAi: false),
                           ),
                           ...aiTypes.map(
-                            (type) => _buildTagChip(type, isAi: true),
+                                (type) => _buildTagChip(type, isAi: true),
                           ),
                         ],
                       ),
@@ -373,52 +420,35 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
-                  Visibility(
-                    visible: story.summary != null,
-                    child: const SizedBox(height: 8),
-                  ),
-
-                  Visibility(
-                    visible: story.summary != null,
-                    child: Text(
-                      story.summary ?? "",
+                  if (story.summary != null) const SizedBox(height: 8),
+                  if (story.summary != null)
+                    Text(
+                      story.summary!,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white60),
+                      style: const TextStyle(color: Colors.white60),
                     ),
-                  ),
-
-                  Visibility(
-                    visible: story.summary != null,
-                    child: const SizedBox(height: 16),
-                  ),
-                  // 1. Add the Row at the bottom of the Padding's Column
+                  if (story.summary != null) const SizedBox(height: 16),
                   Row(
                     children: [
-                      // Stack of icons
                       SizedBox(
                         height: 24,
                         width: (uniqueSources.length * 14.0) + 10,
-                        // Dynamic width based on count
                         child: Stack(
-                          children: List.generate(uniqueSources.length, (
-                            index,
-                          ) {
+                          children: List.generate(uniqueSources.length, (index) {
                             return Positioned(
-                              left: index * 14.0, // Overlap effect
+                              left: index * 14.0,
                               child: Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.black,
                                     width: 2,
-                                  ), // Provides separation
+                                  ),
                                 ),
                                 child: CircleAvatar(
                                   radius: 10,
                                   backgroundColor: Colors.grey[900],
-                                  // Map sourceId to your local asset path
                                   backgroundImage: AssetImage(
                                     'assets/images/${uniqueSources[index].toLowerCase()}.png',
                                   ),
@@ -429,7 +459,6 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Combined Source Text and Date
                       Expanded(
                         child: Text(
                           "${uniqueSources.join(', ')} • $dateDisplay",
@@ -453,32 +482,27 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
 
   Widget _buildTagChip(String label, {required bool isAi}) {
     return ClipRRect(
-      // Clips the blur to the border radius
       borderRadius: BorderRadius.circular(6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          // Use higher opacity and a touch of white for AI to fight dark/busy images
-          color:
-              isAi
-                  ? Colors.deepPurple.withValues(alpha: 0.85)
-                  : Colors.black.withValues(alpha: 0.7),
+          color: isAi
+              ? Colors.deepPurple.withValues(alpha: 0.85)
+              : Colors.black.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isAi ? Colors.deepPurple : Colors.white24,
             width: 1,
           ),
-          // Optional: Add a subtle outer glow for the AI tag
-          boxShadow:
-              isAi
-                  ? [
-                    BoxShadow(
-                      color: Colors.deepPurple.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                  : [],
+          boxShadow: isAi
+              ? [
+            BoxShadow(
+              color: Colors.deepPurple.withValues(alpha: 0.3),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ]
+              : [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -487,15 +511,15 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
               const Icon(
                 Icons.auto_awesome,
                 size: 12,
-                color: Colors.white, // White icon pops better on purple
+                color: Colors.white,
               ),
             if (isAi) const SizedBox(width: 4),
             Text(
               label.toUpperCase(),
-              style: TextStyle(
-                color: Colors.white, // Solid white text is the most readable
+              style: const TextStyle(
+                color: Colors.white,
                 fontSize: 10,
-                fontWeight: FontWeight.w900, // Extra bold for small text
+                fontWeight: FontWeight.w900,
                 letterSpacing: 0.5,
               ),
             ),

@@ -485,7 +485,7 @@ class Globals {
       // Exclude news about entertainment industry business
       'industria filmului', 'piata cinematografica', 'box office record',
       // Exclude political/diplomatic cultural events
-      'eveniment diplomatic', 'vizita de stat',
+      'eveniment diplomatic', 'vizita de stat', 'spion',
     ],
     'Știință și Tehnologie': [
       // Exclude science education policy (that's politics)

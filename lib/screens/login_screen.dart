@@ -22,15 +22,65 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
-  void _handleLogin() {
-    AuthService().loginWithEmail(
-      "email",
-      "password",
+  void _handleLogin() async {
+    // Simple local validation before even calling Firebase
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      _showErrorSnackBar("Please fill in all fields.");
+      return;
+    }
+
+    // Show a loading indicator (optional but recommended)
+    final String? error = await AuthService().loginWithEmail(
+      _emailController.text.trim(),
+      _passwordController.text,
     );
+
+    if (error != null) {
+      _showErrorSnackBar(error);
+    } else {
+      Navigator.pushReplacementNamed(context, '/home');
+    }
   }
 
-  void _handleSignUp() {
+  void _handleSignUp() async {
+    // 1. Manual Validation: Check for empty fields
+    if (_emailController.text.isEmpty ||
+        _passwordController.text.isEmpty) {
+      _showErrorSnackBar("Please fill in all fields.");
+      return;
+    }
 
+    // 2. Manual Validation: Check password length (Firebase requires 6+ characters)
+    if (_passwordController.text.length < 6) {
+      _showErrorSnackBar("Password must be at least 6 characters.");
+      return;
+    }
+
+    // 3. Call the AuthService and wait for the result
+    final String? error = await AuthService().signUpWithEmail(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    // 4. Handle the result
+    if (error != null) {
+      _showErrorSnackBar(error);
+    } else {
+      // Note: Firebase automatically logs the user in after a successful sign-up.
+      // If you are using an AuthGate, it will switch screens automatically.
+      debugPrint("Sign up successful!");
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(color: Colors.white),),
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating, // Makes it look modern
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
@@ -84,7 +134,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            "NEWS",
+                            "Welcome!",
                             style: GoogleFonts.lexend(
                               color: Colors.white,
                               fontSize: 22,
@@ -104,6 +154,7 @@ class _LoginPageState extends State<LoginPage> {
 
                           _buildGlassTextField(
                             hint: "Password",
+                            isPwd: true,
                             icon: Icons.lock_outline,
                             controller: _passwordController,
                           ),
@@ -198,11 +249,7 @@ class _LoginPageState extends State<LoginPage> {
                                   style: const TextStyle(color: Colors.white70),
                                 ),
                                 TextButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _isLogin = !_isLogin;
-                                    });
-                                  },
+                                  onPressed: () => _toggleMode(),
                                   child: Text(
                                     _isLogin ? "Sign up" : "Login",
                                     style: const TextStyle(
@@ -231,16 +278,18 @@ class _LoginPageState extends State<LoginPage> {
     required String hint,
     required IconData icon,
     required controller,
+    bool isPwd = false,
   }) {
     return TextField(
       controller: controller,
+      obscureText: isPwd,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: Colors.white70),
         hintText: hint,
         hintStyle: const TextStyle(color: Colors.white38),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+        fillColor: Colors.white.withValues(alpha: 0.05),
         contentPadding: const EdgeInsets.symmetric(vertical: 20),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
@@ -248,7 +297,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
       ),
     );

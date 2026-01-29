@@ -1,13 +1,12 @@
 class Globals {
   static final Map<String, String> sourceConfigs = {
     "Adevarul": "https://adevarul.ro/",
+    "Antena3": "https://www.antena3.ro/",
     "Digi24": "https://www.digi24.ro/",
+    "HotNews": "https://hotnews.ro/",
+    "Libertatea": "https://www.libertatea.ro/",
+    "RomaniaTV": "https://www.romaniatv.net/",
     "TVRInfo": "https://tvrinfo.ro/",
-
-    // "HotNews": "https://hotnews.ro/",
-    // "Libertatea": "https://www.libertatea.ro/",
-    // "RomaniaTV": "https://www.romaniatv.net/",
-    // "Antena3": "https://www.antena3.ro/",
 
     // Good to go:
     // "stiripesurse": "https://www.stiripesurse.ro/",
@@ -462,6 +461,7 @@ class Globals {
       // Exclude business/economic summits
       'forum economic', 'summit economic', 'davos',
     ],
+
     'World': [
       // Exclude Romanian internal politics
       'guvernul romaniei', 'parlamentul romaniei', 'presedintele romaniei',

@@ -5,8 +5,11 @@ import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
 import '../parsers/adevarul_parser.dart';
+import '../parsers/agerpres.dart';
 import '../parsers/antena3_parser.dart';
+import '../parsers/dc_news_parser.dart';
 import '../parsers/digi24_parser.dart';
+import '../parsers/g4_media_parser.dart';
 import '../parsers/hot_news_parser.dart';
 import '../parsers/libertatea_parser.dart';
 import '../parsers/romania_tv_parser.dart';
@@ -133,9 +136,29 @@ class CrawlerService {
         return await antena3Parser.parse();
       }
 
-      if (url.contains('stiripesurse.ro')) {
+      if (url.contains('stiripesurse')) {
         final stiripesurseParser = StiriPeSurseParser();
         return await stiripesurseParser.parse();
+      }
+
+      if (url.contains('agerpres')) {
+        final agerpresParser = AgerpresParser();
+        return await agerpresParser.parse();
+      }
+
+      if (url.contains('europalibera')) {
+        final europaLiberaParser = AgerpresParser();
+        return await europaLiberaParser.parse();
+      }
+
+      if (url.contains('dcnews')) {
+        final dcNewsParser = DcNewsParser();
+        return await dcNewsParser.parse();
+      }
+
+      if (url.contains('g4media')) {
+        final g4MediaParser = G4MediaParser();
+        return await g4MediaParser.parse();
       }
 
       return [];

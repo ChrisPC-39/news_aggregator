@@ -1,19 +1,20 @@
 class Globals {
   static final Map<String, String> sourceConfigs = {
     "Adevarul": "https://adevarul.ro/",
+    "Agerpres": "https://agerpres.ro/",
     "Antena3": "https://www.antena3.ro/",
+    "DCnews": "https://www.dcnews.ro/",
     "Digi24": "https://www.digi24.ro/",
+    "EuropaLibera": "https://romania.europalibera.org/",
+    "G4media": "https://www.g4media.ro/",
     "HotNews": "https://hotnews.ro/",
     "Libertatea": "https://www.libertatea.ro/",
     "RomaniaTV": "https://www.romaniatv.net/",
+    "stiripesurse": "https://www.stiripesurse.ro/",
     "TVRInfo": "https://tvrinfo.ro/",
 
     // Good to go:
-    // "stiripesurse": "https://www.stiripesurse.ro/",
-    // "Agerpres": "https://agerpres.ro/",
-    // "EuropaLibera": "https://romania.europalibera.org/", //https://romania.europalibera.org/stiri
-    // "DCnews": "https://www.dcnews.ro/",
-    // "G4media": "https://www.g4media.ro/", //green news + main page
+    //  //green news + main page
     // "Profit": "https://www.profit.ro/", //stiri/politica si economie
     // "GreenNews": "https://greennews.ro/", //https://greennews.ro/stiri/
     // "economica.ro": "https://www.economica.net/",
@@ -35,8 +36,6 @@ class Globals {
     // Dynamic, can't scrape
     // "WallStreetRomania": "https://www.wall-street.ro/",
     // "EuroNews": "https://www.euronews.ro/", //RSS Feed only for global feed
-
-
 
     // Site is not ok (missing bunch of info or hard to read)
     // "avocatnet.ro": "https://www.avocatnet.ro/",

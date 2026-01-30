@@ -10,6 +10,8 @@ class Article {
   final String? aiSummary;
   final String? category;
 
+  Set<String>? _normalizedTokens;
+
   Article({
     this.author,
     required this.title,
@@ -25,10 +27,10 @@ class Article {
 
   Map<String, dynamic> toJson() {
     return {
-      // 'author': author,
+      'author': author,
       'title': title,
       'description': description,
-      // 'content': content,
+      'content': content,
       'url': url,
       'urlToImage': urlToImage,
       'publishedAt': publishedAt.toIso8601String(),
@@ -51,5 +53,25 @@ class Article {
       aiSummary: json['aiSummary'] as String?,
       category: json['category'] as String?,
     );
+  }
+
+  Set<String> get normalizedTokens {
+    // "Lazy Initialization"
+    _normalizedTokens ??= _computeTokens(title);
+    return _normalizedTokens!;
+  }
+
+  static Set<String> _computeTokens(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll('ă', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('î', 'i')
+        .replaceAll('ș', 's')
+        .replaceAll('ț', 't')
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .split(RegExp(r'\s+'))
+        .where((s) => s.isNotEmpty)
+        .toSet();
   }
 }

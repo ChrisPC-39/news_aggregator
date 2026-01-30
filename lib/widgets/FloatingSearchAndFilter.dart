@@ -134,32 +134,20 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                                 const SizedBox(height: 8),
 
                                 // Minimum sources chips
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children:
-                                        minSourcesOptions.map((value) {
-                                          final isSelected =
-                                              widget.minimumSources == value;
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              right: 8.0,
-                                            ),
-                                            child: ChoiceChip(
-                                              label: Text('$value+ sources'),
-                                              shape: StadiumBorder(),
-                                              selected: isSelected,
-                                              backgroundColor: Colors.grey
-                                                  .withValues(alpha: 0.3),
-                                              onSelected: (_) {
-                                                widget.onMinimumSourcesChanged(
-                                                  value,
-                                                );
-                                              },
-                                            ),
-                                          );
-                                        }).toList(),
-                                  ),
+                                SegmentedButton<int>(
+                                  segments: const [
+                                    ButtonSegment(value: 1, label: Text('All')),
+                                    ButtonSegment(value: 2, label: Text('2+')),
+                                    ButtonSegment(value: 3, label: Text('3+')),
+                                    ButtonSegment(value: 5, label: Text('5+')),
+                                    ButtonSegment(value: 7, label: Text('7+')),
+                                    ButtonSegment(value: 9, label: Text('9+')),
+                                  ],
+                                  selected: {widget.minimumSources},
+                                  onSelectionChanged: (Set<int> newSelection) {
+                                    widget.onMinimumSourcesChanged(newSelection.first);
+                                  },
+                                  showSelectedIcon: false,
                                 ),
 
                                 const SizedBox(height: 16),
@@ -175,115 +163,7 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children:
-                                        Globals.sourceConfigs.keys.map((sourceName) {
-                                          // Inside Globals.allSources.map(...)
-                                          final sourceId =
-                                              sourceName.toLowerCase();
-                                          final isSelected = widget
-                                              .selectedSources
-                                              .contains(sourceId);
-
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              right: 16.0,
-                                            ),
-                                            child: GestureDetector(
-                                              onTap:
-                                                  () => widget.onSourceToggled(
-                                                    sourceId,
-                                                    !isSelected,
-                                                  ),
-                                              child: Column(
-                                                children: [
-                                                  AnimatedContainer(
-                                                    duration: const Duration(
-                                                      milliseconds: 200,
-                                                    ),
-                                                    padding:
-                                                        const EdgeInsets.all(3),
-                                                    decoration: BoxDecoration(
-                                                      shape: BoxShape.circle,
-                                                      border: Border.all(
-                                                        color:
-                                                            isSelected
-                                                                ? Colors
-                                                                    .deepPurpleAccent
-                                                                : Colors
-                                                                    .transparent,
-                                                        width: 2,
-                                                      ),
-                                                    ),
-                                                    child: ColorFiltered(
-                                                      // Use a Saturation Matrix: 0 is grayscale, 1 is full color
-                                                      colorFilter:
-                                                          isSelected
-                                                              ? const ColorFilter.mode(
-                                                                Colors
-                                                                    .transparent,
-                                                                BlendMode
-                                                                    .multiply,
-                                                              )
-                                                              : const ColorFilter.matrix(
-                                                                <double>[
-                                                                  0.2126,
-                                                                  0.7152,
-                                                                  0.0722,
-                                                                  0,
-                                                                  0,
-                                                                  0.2126,
-                                                                  0.7152,
-                                                                  0.0722,
-                                                                  0,
-                                                                  0,
-                                                                  0.2126,
-                                                                  0.7152,
-                                                                  0.0722,
-                                                                  0,
-                                                                  0,
-                                                                  0,
-                                                                  0,
-                                                                  0,
-                                                                  1,
-                                                                  0,
-                                                                ],
-                                                              ),
-                                                      child: CircleAvatar(
-                                                        radius: 20,
-                                                        backgroundColor:
-                                                            Colors.white,
-                                                        backgroundImage: AssetImage(
-                                                          'assets/images/$sourceId.png',
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    sourceName,
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color:
-                                                          isSelected
-                                                              ? Colors.white
-                                                              : Colors.grey,
-                                                      fontWeight:
-                                                          isSelected
-                                                              ? FontWeight.bold
-                                                              : FontWeight
-                                                                  .normal,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        }).toList(),
-                                  ),
-                                ),
+                                _buildSources(),
                               ],
                             ),
                           )
@@ -337,6 +217,102 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSources() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children:
+            Globals.sourceConfigs.keys.map((sourceName) {
+              // Inside Globals.allSources.map(...)
+              final sourceId = sourceName.toLowerCase();
+              final isSelected = widget.selectedSources.contains(sourceId);
+              final imageName = sourceId.replaceAll('.ro', '').replaceAll('.net', '');
+
+              return SizedBox(
+                width: 65,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16.0),
+                  child: GestureDetector(
+                    onTap: () => widget.onSourceToggled(sourceId, !isSelected),
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? Colors.deepPurpleAccent
+                                      : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                          child: ColorFiltered(
+                            // Use a Saturation Matrix: 0 is grayscale, 1 is full color
+                            colorFilter:
+                                isSelected
+                                    ? const ColorFilter.mode(
+                                      Colors.transparent,
+                                      BlendMode.multiply,
+                                    )
+                                    : const ColorFilter.matrix(<double>[
+                                      0.2126,
+                                      0.7152,
+                                      0.0722,
+                                      0,
+                                      0,
+                                      0.2126,
+                                      0.7152,
+                                      0.0722,
+                                      0,
+                                      0,
+                                      0.2126,
+                                      0.7152,
+                                      0.0722,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      1,
+                                      0,
+                                    ]),
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: Colors.white,
+                              backgroundImage: AssetImage(
+                                'assets/images/$imageName.png',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          sourceName,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isSelected ? Colors.white : Colors.grey,
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
       ),
     );
   }

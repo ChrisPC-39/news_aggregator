@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart';
+
 import 'package:intl/intl.dart';
 
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class AgerpresParser {
+class AgerpresParser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://agerpres.ro/national': 'Politică internă',
@@ -14,6 +15,7 @@ class AgerpresParser {
   };
 
   /// Main entry point
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

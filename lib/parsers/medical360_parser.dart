@@ -2,14 +2,16 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class Medical360Parser {
+class Medical360Parser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://www.360medical.ro/toate': 'Health',
   };
 
   /// Main entry point - parse all 360medical categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 

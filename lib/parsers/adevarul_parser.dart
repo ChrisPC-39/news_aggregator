@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart';
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class AdevarulParser {
+class AdevarulParser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://adevarul.ro/stiri-interne': null,
@@ -15,12 +16,16 @@ class AdevarulParser {
   };
 
   /// Main entry point - parse all Adevarul categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 
     for (final entry in _categoryUrls.entries) {
       try {
-        final categoryArticles = await _parseCategoryPage(entry.key, entry.value);
+        final categoryArticles = await _parseCategoryPage(
+          entry.key,
+          entry.value,
+        );
         allArticles.addAll(categoryArticles);
       } catch (e) {
         continue;
@@ -46,23 +51,22 @@ class AdevarulParser {
       }
     }
 
-    print('✅ Adevarul: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    print(
+      '✅ Adevarul: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)',
+    );
     // Convert map values back to a list
     return uniqueArticles.values.toList();
   }
 
   /// Parse a single category page
-  Future<List<Article>> _parseCategoryPage(
-      String url,
-      String? category,
-      ) async {
+  Future<List<Article>> _parseCategoryPage(String url, String? category) async {
     final List<Article> articles = [];
 
     final response = await http.get(
       Uri.parse(url),
       headers: {
         'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     );
 
@@ -95,21 +99,23 @@ class AdevarulParser {
         }
 
         // Ensure full URL
-        final fullUrl = link.startsWith('http')
-            ? link
-            : 'https://adevarul.ro$link';
+        final fullUrl =
+            link.startsWith('http') ? link : 'https://adevarul.ro$link';
 
         // Skip if URL is still just the homepage after processing
-        if (fullUrl == 'https://adevarul.ro/' || fullUrl == 'https://adevarul.ro') {
+        if (fullUrl == 'https://adevarul.ro/' ||
+            fullUrl == 'https://adevarul.ro') {
           continue;
         }
 
         // Extract description
-        final description = container.querySelector('.summary')?.text.trim() ?? '';
+        final description =
+            container.querySelector('.summary')?.text.trim() ?? '';
 
         // Extract image - look for <img> tag in picture element
         String? imageUrl;
-        final imgElement = container.querySelector('.cover img') ??
+        final imgElement =
+            container.querySelector('.cover img') ??
             container.querySelector('.poster img') ??
             container.querySelector('img');
 
@@ -196,7 +202,9 @@ class AdevarulParser {
     };
 
     // Match pattern: "16 ian. 2026" or "16 ianuarie 2026"
-    final match = RegExp(r'(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})').firstMatch(dateText.toLowerCase());
+    final match = RegExp(
+      r'(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})',
+    ).firstMatch(dateText.toLowerCase());
 
     if (match == null) return DateTime.now();
 

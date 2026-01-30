@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart';
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class HotNewsParser {
+class HotNewsParser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://hotnews.ro/c/economie': 'Business',
@@ -13,6 +14,7 @@ class HotNewsParser {
   };
 
   /// Main entry point - parse all HotNews categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

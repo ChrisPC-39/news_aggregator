@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart' as xml;
 import 'package:html/parser.dart' as parser;
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class Digi24Parser {
+class Digi24Parser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://www.digi24.ro/stiri/actualitate/politica': 'Politică internă',
@@ -18,6 +19,7 @@ class Digi24Parser {
   static const String _rssUrl = 'https://www.digi24.ro/rss_files/google_news.xml';
 
   /// Main entry point - parse all Digi24 categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 

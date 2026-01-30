@@ -1,7 +1,8 @@
 import 'dart:async';
-
+import 'package:news_aggregator/services/v3_score_service.dart';
 import '../globals.dart';
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 import '../models/news_story_model.dart';
 import '../parsers/adevarul_parser.dart';
 import '../parsers/agerpres.dart';
@@ -27,56 +28,69 @@ import '../parsers/stiri_pe_surse_parser.dart';
 import '../parsers/tvr_info_parser.dart';
 import 'local_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
-import 'old_score_service.dart';
 
 class CrawlerService {
   final localRepo = LocalArticleRepository();
   final scoreService = ScoreService();
   final GroupedStoriesCacheService cache = GroupedStoriesCacheService();
 
-  // StreamController to notify when processing is complete
   final _processingController = StreamController<bool>.broadcast();
 
   Stream<bool> get isProcessing => _processingController.stream;
 
   Stream<List<NewsStory>> watchGroupedStories() {
     final controller = StreamController<List<NewsStory>>();
-
-    // Load from cache once
     final initialStories = cache.load();
     controller.add(initialStories);
-
     return controller.stream;
   }
 
   Future<void> refreshStories() async {
-    final articles = localRepo.getArticles();
+    _processingController.add(true);
+    final stopwatch = Stopwatch()..start();
 
-    final grouped = scoreService.groupArticlesIncremental([], articles);
-
-    // Deduplication
-    for (var story in grouped) {
-      final seen = <String>{};
-      story.articles.retainWhere((article) {
-        final key =
-            '${article.sourceName}::${article.title.trim().toLowerCase()}';
-        if (seen.contains(key)) return false;
-        seen.add(key);
-        return true;
-      });
+    // 1. Load articles from local storage
+    final rawArticles = localRepo.getArticles();
+    if (rawArticles.isEmpty) {
+      _processingController.add(false);
+      return;
     }
-    grouped.removeWhere((story) => story.articles.isEmpty);
 
+    // 2. Pre-process / Deduplicate raw articles
+    // Doing this before grouping saves thousands of similarity checks
+    final Map<String, Article> uniqueMap = {};
+    for (var a in rawArticles) {
+      final key = '${a.sourceName}::${a.title.trim().toLowerCase()}';
+      if (!uniqueMap.containsKey(key) ||
+          a.publishedAt.isAfter(uniqueMap[key]!.publishedAt)) {
+        uniqueMap[key] = a;
+      }
+    }
+    final deduplicatedArticles = uniqueMap.values.toList();
+
+    // 3. WARM UP: Trigger RegEx/Normalization in parallel
+    // This ensures ScoreService finds the data already cached in the Article model
+    await Future.wait(
+      deduplicatedArticles.map((a) async => a.normalizedTokens),
+    );
+
+    // 4. Group articles using the optimized ScoreService
+    final grouped = scoreService.groupArticles(deduplicatedArticles);
+
+    stopwatch.stop();
+    print(
+      '⚡ Grouping completed: ${grouped.length} stories from ${deduplicatedArticles.length} articles in ${stopwatch.elapsedMilliseconds}ms',
+    );
+
+    // 5. Save to cache and notify UI
     await cache.save(grouped);
     _processingController.add(false);
   }
 
-  /// Fetch all sources and sync to local storage
   Future<void> fetchAllSources() async {
     final totalStopwatch = Stopwatch()..start();
     print('\n🚀 Starting fetchAllSources (parallel)...\n');
 
-    // Crawl all sources in parallel
     final futures =
         Globals.sourceConfigs.values.map((url) async {
           final siteStopwatch = Stopwatch()..start();
@@ -101,129 +115,53 @@ class CrawlerService {
 
     totalStopwatch.stop();
     print('  ⏱️  Saving to Hive: ${saveStopwatch.elapsedMilliseconds}ms');
-    print(
-      '✅ Total crawl time: ${totalStopwatch.elapsedMilliseconds}ms (${(totalStopwatch.elapsedMilliseconds / 1000).toStringAsFixed(2)}s)\n',
-    );
+    print('✅ Total crawl time: ${totalStopwatch.elapsedMilliseconds}ms\n');
+
+    // Automatically trigger grouping after a fresh crawl
+    await refreshStories();
   }
 
   Future<List<Article>> crawlSite(String url) async {
+    // Use a registry map for O(1) lookup
+    final Map<String, BaseParser Function()> parserRegistry = {
+      'digi24.ro': () => Digi24Parser(),
+      'adevarul.ro': () => AdevarulParser(),
+      'tvrinfo.ro': () => TvrInfoParser(),
+      'hotnews': () => HotNewsParser(),
+      'libertatea': () => LibertateaParser(),
+      'romaniatv': () => RomaniaTVParser(),
+      'antena3': () => Antena3Parser(),
+      'stiripesurse': () => StiriPeSurseParser(),
+      'agerpres': () => AgerpresParser(),
+      'dcnews': () => DcNewsParser(),
+      'g4media': () => G4MediaParser(),
+      'profit': () => ProfitParser(),
+      'greennews': () => GreenNewsParser(),
+      'economica': () => EconomicaParser(),
+      'forbes': () => ForbesParser(),
+      'cursdeguvernare': () => CursDeGuvernareParser(),
+      'retail-fmcg': () => RetailFmcgParser(),
+      'revistaprogresiv': () => RevistaProgresivParser(),
+      'euractiv': () => EuractivParser(),
+      'retail.ro': () => RetailRoParser(),
+      '360medical.ro': () => Medical360Parser(),
+      'edupedu': () => EdupeduParser(),
+    };
+
     try {
-      if (url.contains('digi24.ro')) {
-        final digi24Parser = Digi24Parser();
-        return await digi24Parser.parse();
-      }
+      final lowerUrl = url.toLowerCase();
 
-      if (url.contains('adevarul.ro')) {
-        final adevaruParser = AdevarulParser();
-        return await adevaruParser.parse();
-      }
+      // Find the first key that matches the URL
+      final entry = parserRegistry.entries.firstWhere(
+            (e) => lowerUrl.contains(e.key),
+        orElse: () => MapEntry('none', () => throw 'No parser found'),
+      );
 
-      if (url.contains('tvrinfo.ro')) {
-        final tvrinfoParser = TvrInfoParser();
-        return await tvrinfoParser.parse();
-      }
+      if (entry.key == 'none') return [];
 
-      if (url.toLowerCase().contains("hotnews")) {
-        final hotNewsParser = HotNewsParser();
-        return await hotNewsParser.parse();
-      }
+      // Instantiate and parse
+      return await entry.value().parse();
 
-      if (url.toLowerCase().contains("libertatea")) {
-        final libertateaParser = LibertateaParser();
-        return await libertateaParser.parse();
-      }
-
-      if (url.toLowerCase().contains("romaniatv")) {
-        final romaniaTVParser = RomaniaTVParser();
-        return await romaniaTVParser.parse();
-      }
-
-      if (url.toLowerCase().contains("antena3")) {
-        final antena3Parser = Antena3Parser();
-        return await antena3Parser.parse();
-      }
-
-      if (url.contains('stiripesurse')) {
-        final stiripesurseParser = StiriPeSurseParser();
-        return await stiripesurseParser.parse();
-      }
-
-      if (url.contains('agerpres')) {
-        final agerpresParser = AgerpresParser();
-        return await agerpresParser.parse();
-      }
-
-      if (url.contains('europalibera')) {
-        final europaLiberaParser = AgerpresParser();
-        return await europaLiberaParser.parse();
-      }
-
-      if (url.contains('dcnews')) {
-        final dcNewsParser = DcNewsParser();
-        return await dcNewsParser.parse();
-      }
-
-      if (url.contains('g4media')) {
-        final g4MediaParser = G4MediaParser();
-        return await g4MediaParser.parse();
-      }
-
-      if (url.contains('profit')) {
-        final profitParser = ProfitParser();
-        return await profitParser.parse();
-      }
-
-      if (url.contains('greennews')) {
-        final greennewsParser = GreenNewsParser();
-        return await greennewsParser.parse();
-      }
-
-      if (url.contains('economica')) {
-        final economicaParser = EconomicaParser();
-        return await economicaParser.parse();
-      }
-
-      if (url.contains('forbes')) {
-        final forbesParser = ForbesParser();
-        return await forbesParser.parse();
-      }
-
-      if (url.contains('cursdeguvernare')) {
-        final cursDeGuvernareParser = CursDeGuvernareParser();
-        return await cursDeGuvernareParser.parse();
-      }
-
-      if (url.contains('retail-fmcg')) {
-        final retailFmcgParser = RetailFmcgParser();
-        return await retailFmcgParser.parse();
-      }
-
-      if (url.contains('revistaprogresiv')) {
-        final revistaProgresivParser = RevistaProgresivParser();
-        return await revistaProgresivParser.parse();
-      }
-
-      if (url.contains('euractiv')) {
-        final euractivParser = EuractivParser();
-        return await euractivParser.parse();
-      }
-
-      if (url.contains('retail.ro')) {
-        final retailRoParser = RetailRoParser();
-        return await retailRoParser.parse();
-      }
-
-      if (url.contains('360medical.ro')) {
-        final medical360Parser = Medical360Parser();
-        return await medical360Parser.parse();
-      }
-
-      if (url.contains('edupedu')) {
-        final edupeduParser = EdupeduParser();
-        return await edupeduParser.parse();
-      }
-
-      return [];
     } catch (e) {
       print('  ❌ Error crawling $url: $e');
       return [];

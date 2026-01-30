@@ -7,6 +7,8 @@ class Globals {
     "DCnews": "https://www.dcnews.ro/",
     "Digi24": "https://www.digi24.ro/",
     "economica.ro": "https://www.economica.net/",
+    "Edupedu": "https://www.edupedu.ro/",
+    "euractiv": "https://www.euractiv.ro/",
     "EuropaLibera": "https://romania.europalibera.org/",
     "ForbesRomania": "https://www.forbes.ro/",
     "G4media": "https://www.g4media.ro/",
@@ -14,23 +16,17 @@ class Globals {
     "HotNews": "https://hotnews.ro/",
     "Libertatea": "https://www.libertatea.ro/",
     "Profit": "https://www.profit.ro/",
+    "Retail.ro": "https://www.retail.ro/",
     "Retail-FMCG": "https://www.retail-fmcg.ro/",
     "RevistaProgresiv": "https://revistaprogresiv.ro/",
     "RomaniaTV": "https://www.romaniatv.net/",
     "stiripesurse": "https://www.stiripesurse.ro/",
     "TVRInfo": "https://tvrinfo.ro/",
-
-    // Good to go:
-    // "euractiv": "https://www.euractiv.ro/",
-    // "Retail.ro": "https://www.retail.ro/",
-    // "RevistaBIZ": "https://www.revistabiz.ro/",
-    // "360medical.ro": "https://www.360medical.ro/",
-    // "Edupedu": "https://www.edupedu.ro/",
-
+    "360medical.ro": "https://www.360medical.ro/",
 
     // Dynamic, can't scrape
     // "WallStreetRomania": "https://www.wall-street.ro/",
-    // "EuroNews": "https://www.euronews.ro/", //RSS Feed only for global feed
+    // "EuroNews": "https://www.euronews.ro/", //RSS Feed only for global feed - not romanian
 
     // Site is not ok (missing bunch of info or hard to read)
     // "avocatnet.ro": "https://www.avocatnet.ro/",
@@ -39,6 +35,7 @@ class Globals {
     // "MedicalNews": "https://www.medicalnews.ro/", // Not loading at all
     // "UniversulJuridic.ro": "https://www.universuljuridic.ro/", // Not sure what news these are (looks more like opinion pieces)
     // "Juridice.ro": "https://www.juridice.ro/", //https://www.juridice.ro/flux-informatii
+    // "RevistaBIZ": "https://www.revistabiz.ro/", // not a lot of info and odd articles
   };
 
   static Map<String, List<String>> storyTypeKeywords = {

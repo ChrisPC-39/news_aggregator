@@ -1,24 +1,27 @@
 import 'dart:async';
 
-import 'package:html/dom.dart';
-import 'package:news_aggregator/parsers/curs_de_guvernare_parser.dart';
-import 'package:news_aggregator/parsers/green_news_parser.dart';
-import 'package:news_aggregator/parsers/retail_fmcg_parser.dart';
-import 'package:news_aggregator/parsers/revista_progresiv_parser.dart';
 import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
 import '../parsers/adevarul_parser.dart';
 import '../parsers/agerpres.dart';
 import '../parsers/antena3_parser.dart';
+import '../parsers/curs_de_guvernare_parser.dart';
 import '../parsers/dc_news_parser.dart';
 import '../parsers/digi24_parser.dart';
 import '../parsers/economica_parser.dart';
+import '../parsers/edupedu_parser.dart';
+import '../parsers/euractiv_parser.dart';
 import '../parsers/forbes_parser.dart';
 import '../parsers/g4_media_parser.dart';
+import '../parsers/green_news_parser.dart';
 import '../parsers/hot_news_parser.dart';
 import '../parsers/libertatea_parser.dart';
+import '../parsers/medical360_parser.dart';
 import '../parsers/profit_parser.dart';
+import '../parsers/retail_fmcg_parser.dart';
+import '../parsers/retail_ro_parser.dart';
+import '../parsers/revista_progresiv_parser.dart';
 import '../parsers/romania_tv_parser.dart';
 import '../parsers/stiri_pe_surse_parser.dart';
 import '../parsers/tvr_info_parser.dart';
@@ -198,6 +201,26 @@ class CrawlerService {
       if (url.contains('revistaprogresiv')) {
         final revistaProgresivParser = RevistaProgresivParser();
         return await revistaProgresivParser.parse();
+      }
+
+      if (url.contains('euractiv')) {
+        final euractivParser = EuractivParser();
+        return await euractivParser.parse();
+      }
+
+      if (url.contains('retail.ro')) {
+        final retailRoParser = RetailRoParser();
+        return await retailRoParser.parse();
+      }
+
+      if (url.contains('360medical.ro')) {
+        final medical360Parser = Medical360Parser();
+        return await medical360Parser.parse();
+      }
+
+      if (url.contains('edupedu')) {
+        final edupeduParser = EdupeduParser();
+        return await edupeduParser.parse();
       }
 
       return [];

@@ -78,9 +78,9 @@ class CrawlerService {
     final grouped = scoreService.groupArticles(deduplicatedArticles);
 
     stopwatch.stop();
-    print(
-      '⚡ Grouping completed: ${grouped.length} stories from ${deduplicatedArticles.length} articles in ${stopwatch.elapsedMilliseconds}ms',
-    );
+    // print(
+    //   '⚡ Grouping completed: ${grouped.length} stories from ${deduplicatedArticles.length} articles in ${stopwatch.elapsedMilliseconds}ms',
+    // );
 
     // 5. Save to cache and notify UI
     await cache.save(grouped);
@@ -89,7 +89,7 @@ class CrawlerService {
 
   Future<void> fetchAllSources() async {
     final totalStopwatch = Stopwatch()..start();
-    print('\n🚀 Starting fetchAllSources (parallel)...\n');
+    // print('\n🚀 Starting fetchAllSources (parallel)...\n');
 
     final futures =
         Globals.sourceConfigs.values.map((url) async {
@@ -98,24 +98,24 @@ class CrawlerService {
           siteStopwatch.stop();
 
           final domain = Uri.parse(url).host.replaceFirst('www.', '');
-          print(
-            '  ⏱️  $domain: ${articles.length} articles in ${siteStopwatch.elapsedMilliseconds}ms',
-          );
+          // print(
+          //   '  ⏱️  $domain: ${articles.length} articles in ${siteStopwatch.elapsedMilliseconds}ms',
+          // );
           return articles;
         }).toList();
 
     final results = await Future.wait(futures);
     final allArticles = results.expand((list) => list).toList();
 
-    print('\n📊 Total articles crawled: ${allArticles.length}');
+    // print('\n📊 Total articles crawled: ${allArticles.length}');
 
     final saveStopwatch = Stopwatch()..start();
     await localRepo.saveArticles(allArticles);
     saveStopwatch.stop();
 
     totalStopwatch.stop();
-    print('  ⏱️  Saving to Hive: ${saveStopwatch.elapsedMilliseconds}ms');
-    print('✅ Total crawl time: ${totalStopwatch.elapsedMilliseconds}ms\n');
+    // print('  ⏱️  Saving to Hive: ${saveStopwatch.elapsedMilliseconds}ms');
+    // print('✅ Total crawl time: ${totalStopwatch.elapsedMilliseconds}ms\n');
 
     // Automatically trigger grouping after a fresh crawl
     await refreshStories();

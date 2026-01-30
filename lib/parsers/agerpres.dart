@@ -36,8 +36,8 @@ class AgerpresParser extends BaseParser {
       }
     }
 
-    print(
-        '✅ Agerpres: Parsed ${allArticles.length} unique articles (deduplicated)');
+    // print(
+    //     '✅ Agerpres: Parsed ${allArticles.length} unique articles (deduplicated)');
     return allArticles;
   }
 
@@ -48,7 +48,7 @@ class AgerpresParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -66,7 +66,7 @@ class AgerpresParser extends BaseParser {
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final cards = document.querySelectorAll('div.card.bg-transparent');
 
-    print('📦 Found ${cards.length} cards on $url');
+    // print('📦 Found ${cards.length} cards on $url');
 
     for (final card in cards) {
       try {
@@ -122,7 +122,7 @@ class AgerpresParser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 }

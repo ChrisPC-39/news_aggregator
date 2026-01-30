@@ -46,7 +46,7 @@ class Medical360Parser extends BaseParser {
       }
     }
 
-    print('✅ 360medical: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    // print('✅ 360medical: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
     // Return only the values of the map (the latest unique articles)
     return uniqueArticles.values.toList();
   }

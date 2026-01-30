@@ -47,7 +47,7 @@ class RevistaProgresivParser extends BaseParser {
       }
     }
 
-    print('✅ Revista Progresiv: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    // print('✅ Revista Progresiv: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
     // Return only the values of the map (the latest unique articles)
     return uniqueArticles.values.toList();
   }

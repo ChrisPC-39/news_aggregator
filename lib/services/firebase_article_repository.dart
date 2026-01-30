@@ -213,11 +213,9 @@ class FirebaseArticleRepository {
     if (batch0Articles.length > articlesPerBatch) {
       await _rotateBatches(batch0Articles, totalBatches);
     } else {
-      print('--- Batch 0 Articles (${batch0Articles.length}) ---');
       for (var i = 0; i < batch0Articles.length; i++) {
         print('[$i] ${batch0Articles[i].title}');
       }
-      print('-------------------------------------------');
       // Just update batch_0
       await _firestore.collection(_collection).doc('batch_0').set({
         'articles': batch0Articles.map((a) => a.toJson()).toList(),

@@ -3,8 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import 'package:html/dom.dart';
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class StiriPeSurseParser {
+class StiriPeSurseParser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://www.stiripesurse.ro/politica': 'Politică internă',
@@ -14,6 +15,7 @@ class StiriPeSurseParser {
   };
 
   /// Main entry point - parse all StiriPeSurse categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

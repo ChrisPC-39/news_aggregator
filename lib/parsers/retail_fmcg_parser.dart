@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class RetailFmcgParser {
+class RetailFmcgParser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://www.retail-fmcg.ro/cat/retail/retail-national': 'Business',
@@ -12,6 +13,7 @@ class RetailFmcgParser {
   };
 
   /// Main entry point - parse all Retail-FMCG categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 

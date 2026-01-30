@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart';
-import '../models/article_model.dart';
 
-class RomaniaTVParser {
+import '../models/article_model.dart';
+import '../models/base_parser.dart';
+
+class RomaniaTVParser extends BaseParser {
   /// Category URL → App category mapping
   static const Map<String, String?> _categoryUrls = {
     'https://www.romaniatv.net/politica': 'Politică internă',
@@ -14,6 +15,7 @@ class RomaniaTVParser {
   };
 
   /// Main entry point
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

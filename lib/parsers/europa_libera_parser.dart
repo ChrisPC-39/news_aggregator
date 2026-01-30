@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart';
 
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class EuropaLiberaParser {
+class EuropaLiberaParser extends BaseParser {
   static const String _baseUrl = 'https://romania.europalibera.org';
 
   // Category URL mappings
@@ -16,6 +16,7 @@ class EuropaLiberaParser {
   };
 
   /// Main entry point
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

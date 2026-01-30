@@ -1,17 +1,18 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart';
 
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class DcNewsParser {
+class DcNewsParser extends BaseParser {
   static const Map<String, String> _categoryUrls = {
     'https://www.dcnews.ro/politica': 'Politică internă',
     'https://www.dcnews.ro/economie-si-afaceri': 'Business',
     'https://www.dcnews.ro/news/international': 'World',
   };
 
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

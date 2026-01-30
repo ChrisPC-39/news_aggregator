@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class EuractivParser {
+class EuractivParser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://www.euractiv.ro/eu-elections-2019': 'World',
@@ -13,6 +14,7 @@ class EuractivParser {
   };
 
   /// Main entry point - parse all Euractiv categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 

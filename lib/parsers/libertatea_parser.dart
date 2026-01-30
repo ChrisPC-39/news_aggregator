@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart';
-import '../models/article_model.dart';
 
-class LibertateaParser {
+import '../models/article_model.dart';
+import '../models/base_parser.dart';
+
+class LibertateaParser extends BaseParser {
   /// Category URL → App Category mapping
   static const Map<String, String?> _categoryUrls = {
     'https://www.libertatea.ro/stiri-externe': 'World',
@@ -13,6 +14,7 @@ class LibertateaParser {
   };
 
   /// Main entry point
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class RevistaProgresivParser {
+class RevistaProgresivParser extends BaseParser {
   // Category URL mappings
   static const Map<String, String?> _categoryUrls = {
     'https://revistaprogresiv.ro/retail/': null,
@@ -11,6 +12,7 @@ class RevistaProgresivParser {
   };
 
   /// Main entry point - parse all Revista Progresiv categories
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
 

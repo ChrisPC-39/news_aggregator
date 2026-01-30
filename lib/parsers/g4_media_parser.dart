@@ -1,16 +1,17 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
-import 'package:html/dom.dart';
 
 import '../models/article_model.dart';
+import '../models/base_parser.dart';
 
-class G4MediaParser {
+class G4MediaParser extends BaseParser {
   static const Map<String, String?> _sources = {
     'https://www.g4media.ro/green-news': 'Health',
     'https://www.g4media.ro/': null,
   };
 
+  @override
   Future<List<Article>> parse() async {
     final List<Article> allArticles = [];
     final seenUrls = <String>{};

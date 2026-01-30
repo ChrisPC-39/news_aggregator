@@ -31,7 +31,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   Set<String> selectedCategories = {};
   int minimumSources = 2;
   Set<String> selectedSources =
-  Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
+      Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
 
   // Direct state instead of stream
   List<NewsStory> _stories = [];
@@ -92,7 +92,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   // Run grouping in background isolate
-  Future<List<NewsStory>> _groupArticlesInBackground(List<Article> articles) async {
+  Future<List<NewsStory>> _groupArticlesInBackground(
+    List<Article> articles,
+  ) async {
     // Convert to JSON for serialization
     final articlesJson = articles.map((a) => a.toJson()).toList();
 
@@ -104,9 +106,12 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   // Top-level function for isolate
-  static List<Map<String, dynamic>> _groupArticlesIsolate(List<Map<String, dynamic>> articlesJson) {
+  static List<Map<String, dynamic>> _groupArticlesIsolate(
+    List<Map<String, dynamic>> articlesJson,
+  ) {
     // Reconstruct articles from JSON
-    final articles = articlesJson.map((json) => Article.fromJson(json)).toList();
+    final articles =
+        articlesJson.map((json) => Article.fromJson(json)).toList();
 
     // Use ScoreService to group
     final scoreService = ScoreService();
@@ -116,7 +121,8 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     for (var story in grouped) {
       final seen = <String>{};
       story.articles.retainWhere((article) {
-        final key = '${article.sourceName}::${article.title.trim().toLowerCase()}';
+        final key =
+            '${article.sourceName}::${article.title.trim().toLowerCase()}';
         if (seen.contains(key)) return false;
         seen.add(key);
         return true;
@@ -173,14 +179,15 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
           ],
           bottom: PreferredSize(
             preferredSize: Size.fromHeight(_isLoading ? 3 : 0),
-            child: _isLoading
-                ? LinearProgressIndicator(
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Colors.white.withValues(alpha: 0.8),
-              ),
-            )
-                : const SizedBox.shrink(),
+            child:
+                _isLoading
+                    ? LinearProgressIndicator(
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white.withValues(alpha: 0.8),
+                      ),
+                    )
+                    : const SizedBox.shrink(),
           ),
         ),
         body: Stack(
@@ -196,9 +203,27 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
               searchFocusNode: _searchFocusNode,
               onSourceToggled: (source, isSelected) {
                 setState(() {
-                  isSelected
-                      ? selectedSources.add(source)
-                      : selectedSources.remove(source);
+                  final allSources = Globals.sourceConfigs.keys.map((s) => s.toLowerCase()).toSet();
+
+                  // 1. If currently everything is selected, and we toggle one...
+                  if (selectedSources.length == allSources.length) {
+                    // Switch to "Solo Mode" for the clicked source
+                    selectedSources.clear();
+                    selectedSources.add(source);
+                  }
+                  // 2. Normal toggle behavior
+                  else {
+                    if (isSelected) {
+                      selectedSources.add(source);
+                    } else {
+                      selectedSources.remove(source);
+                    }
+
+                    // 3. Reset to "All" if user unchecks the last item
+                    if (selectedSources.isEmpty) {
+                      selectedSources.addAll(allSources);
+                    }
+                  }
                 });
               },
               onSearchChanged: (value) {
@@ -238,28 +263,30 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
 
     if (stories.isEmpty) {
       return Center(
-        child: _searchQuery.isNotEmpty
-            ? Text('No stories match "$_searchQuery"')
-            : Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('No news found.'),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _searchController.clear();
-                  _searchQuery = '';
-                  selectedCategories.clear();
-                  minimumSources = 1;
-                  selectedSources = Globals.sourceConfigs.keys
-                      .map((source) => source.toLowerCase())
-                      .toSet();
-                });
-              },
-              child: const Text('Clear filters'),
-            ),
-          ],
-        ),
+        child:
+            _searchQuery.isNotEmpty
+                ? Text('No stories match "$_searchQuery"')
+                : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('No news found.'),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                          selectedCategories.clear();
+                          minimumSources = 1;
+                          selectedSources =
+                              Globals.sourceConfigs.keys
+                                  .map((source) => source.toLowerCase())
+                                  .toSet();
+                        });
+                      },
+                      child: const Text('Clear filters'),
+                    ),
+                  ],
+                ),
       );
     }
 
@@ -267,12 +294,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       onRefresh: _refreshNews,
       child: ListView.builder(
         controller: _scrollController,
-        padding: const EdgeInsets.only(
-          top: 8,
-          bottom: 80,
-          left: 8,
-          right: 8,
-        ),
+        padding: const EdgeInsets.only(top: 8, bottom: 80, left: 8, right: 8),
         itemCount: stories.length,
         itemBuilder: (context, index) {
           final story = stories[index];
@@ -289,9 +311,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     return stories.where((story) {
       // 1. Source Filter
       final storySourceIds =
-      story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
       final hasActiveSource = storySourceIds.any(
-            (id) => selectedSources.contains(id),
+        (id) => selectedSources.contains(id),
       );
       if (!hasActiveSource) return false;
 
@@ -323,18 +345,17 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   }
 
   Widget buildNewsStoryCard(
-      BuildContext context,
-      NewsStory story,
-      List<String> sources,
-      ) {
+    BuildContext context,
+    NewsStory story,
+    List<String> sources,
+  ) {
     final manualTypes = story.storyTypes ?? [];
     final aiTypes = story.inferredStoryTypes ?? [];
 
     final articles = story.articles;
 
     // Get unique source names
-    final uniqueSources =
-    articles.map((a) => a.sourceName).toSet().toList();
+    final uniqueSources = articles.map((a) => a.sourceName).toSet().toList();
 
     // Find date range
     final dates = articles.map((a) => a.publishedAt).toList();
@@ -374,9 +395,10 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
           children: [
             SizedBox(
               width: double.infinity,
-              height: story.imageUrl != null && story.imageUrl!.isNotEmpty
-                  ? 200
-                  : 35,
+              height:
+                  story.imageUrl != null && story.imageUrl!.isNotEmpty
+                      ? 200
+                      : 35,
               child: Stack(
                 children: [
                   if (story.imageUrl != null && story.imageUrl!.isNotEmpty)
@@ -397,10 +419,10 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                         runSpacing: 6,
                         children: [
                           ...manualTypes.map(
-                                (type) => _buildTagChip(type, isAi: false),
+                            (type) => _buildTagChip(type, isAi: false),
                           ),
                           ...aiTypes.map(
-                                (type) => _buildTagChip(type, isAi: true),
+                            (type) => _buildTagChip(type, isAi: true),
                           ),
                         ],
                       ),
@@ -435,7 +457,9 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                         height: 24,
                         width: (uniqueSources.length * 14.0) + 10,
                         child: Stack(
-                          children: List.generate(uniqueSources.length, (index) {
+                          children: List.generate(uniqueSources.length, (
+                            index,
+                          ) {
                             return Positioned(
                               left: index * 14.0,
                               child: Container(
@@ -450,7 +474,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                                   radius: 10,
                                   backgroundColor: Colors.grey[900],
                                   backgroundImage: AssetImage(
-                                    'assets/images/${uniqueSources[index].toLowerCase()}.png',
+                                    'assets/images/${uniqueSources[index].toLowerCase().replaceAll('.ro', '').replaceAll('.net', '')}.png',
                                   ),
                                 ),
                               ),
@@ -486,33 +510,31 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isAi
-              ? Colors.deepPurple.withValues(alpha: 0.85)
-              : Colors.black.withValues(alpha: 0.7),
+          color:
+              isAi
+                  ? Colors.deepPurple.withValues(alpha: 0.85)
+                  : Colors.black.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isAi ? Colors.deepPurple : Colors.white24,
             width: 1,
           ),
-          boxShadow: isAi
-              ? [
-            BoxShadow(
-              color: Colors.deepPurple.withValues(alpha: 0.3),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ]
-              : [],
+          boxShadow:
+              isAi
+                  ? [
+                    BoxShadow(
+                      color: Colors.deepPurple.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                  : [],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isAi)
-              const Icon(
-                Icons.auto_awesome,
-                size: 12,
-                color: Colors.white,
-              ),
+              const Icon(Icons.auto_awesome, size: 12, color: Colors.white),
             if (isAi) const SizedBox(width: 4),
             Text(
               label.toUpperCase(),

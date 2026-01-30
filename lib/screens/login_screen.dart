@@ -68,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
     } else {
       // Note: Firebase automatically logs the user in after a successful sign-up.
       // If you are using an AuthGate, it will switch screens automatically.
-      debugPrint("Sign up successful!");
+      // debugPrint("Sign up successful!");
     }
   }
 

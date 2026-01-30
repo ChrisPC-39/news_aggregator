@@ -51,9 +51,9 @@ class AdevarulParser extends BaseParser {
       }
     }
 
-    print(
-      '✅ Adevarul: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)',
-    );
+    // print(
+    //   '✅ Adevarul: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)',
+    // );
     // Convert map values back to a list
     return uniqueArticles.values.toList();
   }

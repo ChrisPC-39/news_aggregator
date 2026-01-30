@@ -37,8 +37,8 @@ class EuropaLiberaParser extends BaseParser {
       }
     }
 
-    print(
-        '✅ Europa Liberă: Parsed ${allArticles.length} unique articles (deduplicated)');
+    // print(
+    //     '✅ Europa Liberă: Parsed ${allArticles.length} unique articles (deduplicated)');
     return allArticles;
   }
 
@@ -49,7 +49,7 @@ class EuropaLiberaParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -67,7 +67,7 @@ class EuropaLiberaParser extends BaseParser {
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final items = document.querySelectorAll('li.archive-list__item');
 
-    print('📦 Found ${items.length} items on $url');
+    // print('📦 Found ${items.length} items on $url');
 
     for (final item in items) {
       try {
@@ -121,7 +121,7 @@ class EuropaLiberaParser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

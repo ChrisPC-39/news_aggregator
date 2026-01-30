@@ -48,7 +48,7 @@ class RetailFmcgParser extends BaseParser {
       }
     }
 
-    print('✅ Retail-FMCG: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    // print('✅ Retail-FMCG: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
     // Return only the values of the map (the latest unique articles)
     return uniqueArticles.values.toList();
   }

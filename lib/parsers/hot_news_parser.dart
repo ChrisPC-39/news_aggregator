@@ -40,7 +40,7 @@ class HotNewsParser extends BaseParser {
       }
     }
 
-    print('✅ HotNews: Parsed ${allArticles.length} unique articles (deduplicated from categories)');
+    // print('✅ HotNews: Parsed ${allArticles.length} unique articles (deduplicated from categories)');
     return allArticles;
   }
 
@@ -51,7 +51,7 @@ class HotNewsParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),

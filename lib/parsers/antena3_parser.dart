@@ -40,7 +40,7 @@ class Antena3Parser extends BaseParser {
       }
     }
 
-    print('✅ Antena3: Parsed ${allArticles.length} unique articles (deduplicated from categories)');
+    // print('✅ Antena3: Parsed ${allArticles.length} unique articles (deduplicated from categories)');
     return allArticles;
   }
 
@@ -51,7 +51,7 @@ class Antena3Parser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -69,7 +69,7 @@ class Antena3Parser extends BaseParser {
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final articleNodes = document.querySelectorAll('article');
 
-    print('📦 Found ${articleNodes.length} articles on $url');
+    // print('📦 Found ${articleNodes.length} articles on $url');
 
     for (final article in articleNodes) {
       try {
@@ -114,7 +114,7 @@ class Antena3Parser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

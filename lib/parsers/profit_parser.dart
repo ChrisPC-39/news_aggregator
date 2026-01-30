@@ -48,7 +48,7 @@ class ProfitParser extends BaseParser {
       }
     }
 
-    print('✅ Profit.ro: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    // print('✅ Profit.ro: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
     // Return only the values of the map (the latest unique articles)
     return uniqueArticles.values.toList();
   }

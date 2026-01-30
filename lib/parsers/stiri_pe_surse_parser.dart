@@ -41,7 +41,7 @@ class StiriPeSurseParser extends BaseParser {
       }
     }
 
-    print('✅ StiriPeSurse: Parsed ${allArticles.length} unique articles (deduplicated from categories)');
+    // print('✅ StiriPeSurse: Parsed ${allArticles.length} unique articles (deduplicated from categories)');
     return allArticles;
   }
 
@@ -52,7 +52,7 @@ class StiriPeSurseParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -70,7 +70,7 @@ class StiriPeSurseParser extends BaseParser {
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final articleNodes = document.querySelectorAll('article');
 
-    print('📦 Found ${articleNodes.length} articles on $url');
+    // print('📦 Found ${articleNodes.length} articles on $url');
 
     for (final article in articleNodes) {
       try {

@@ -66,12 +66,12 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       // Get articles
       final articles = _crawlerService.localRepo.getArticles();
 
-      print('🔄 Starting grouping for ${articles.length} articles...');
+      // print('🔄 Starting grouping for ${articles.length} articles...');
 
       // Run grouping in isolate to prevent UI freeze
       final grouped = await _groupArticlesInBackground(articles);
 
-      print('✅ Grouping complete: ${grouped.length} stories');
+      // print('✅ Grouping complete: ${grouped.length} stories');
 
       // Save to cache
       await _crawlerService.cache.save(grouped);

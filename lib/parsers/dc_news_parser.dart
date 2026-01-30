@@ -33,8 +33,8 @@ class DcNewsParser extends BaseParser {
       }
     }
 
-    print(
-        '✅ DCNews: Parsed ${allArticles.length} unique articles');
+    // print(
+    //     '✅ DCNews: Parsed ${allArticles.length} unique articles');
     return allArticles;
   }
 
@@ -44,7 +44,7 @@ class DcNewsParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -65,7 +65,7 @@ class DcNewsParser extends BaseParser {
 
     final items = document.querySelectorAll('li > div.box_mic');
 
-    print('📦 Found ${items.length} items on $url');
+    // print('📦 Found ${items.length} items on $url');
 
     for (final item in items) {
       try {
@@ -116,7 +116,7 @@ class DcNewsParser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

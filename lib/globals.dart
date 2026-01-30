@@ -3,35 +3,30 @@ class Globals {
     "Adevarul": "https://adevarul.ro/",
     "Agerpres": "https://agerpres.ro/",
     "Antena3": "https://www.antena3.ro/",
+    "CursdeGuvernare": "https://cursdeguvernare.ro/",
     "DCnews": "https://www.dcnews.ro/",
     "Digi24": "https://www.digi24.ro/",
+    "economica.ro": "https://www.economica.net/",
     "EuropaLibera": "https://romania.europalibera.org/",
+    "ForbesRomania": "https://www.forbes.ro/",
     "G4media": "https://www.g4media.ro/",
+    "GreenNews": "https://greennews.ro/",
     "HotNews": "https://hotnews.ro/",
     "Libertatea": "https://www.libertatea.ro/",
+    "Profit": "https://www.profit.ro/",
+    "Retail-FMCG": "https://www.retail-fmcg.ro/",
+    "RevistaProgresiv": "https://revistaprogresiv.ro/",
     "RomaniaTV": "https://www.romaniatv.net/",
     "stiripesurse": "https://www.stiripesurse.ro/",
     "TVRInfo": "https://tvrinfo.ro/",
 
     // Good to go:
-    //  //green news + main page
-    // "Profit": "https://www.profit.ro/", //stiri/politica si economie
-    // "GreenNews": "https://greennews.ro/", //https://greennews.ro/stiri/
-    // "economica.ro": "https://www.economica.net/",
-    // "ForbesRomania": "https://www.forbes.ro/", //https://www.forbes.ro/actualitate
-    // "CursdeGuvernare": "https://cursdeguvernare.ro/", //https://cursdeguvernare.ro/cat/stiri-2
-    // "Retail-FMCG": "https://www.retail-fmcg.ro/",
-    // "Juridice.ro": "https://www.juridice.ro/", //https://www.juridice.ro/flux-informatii
-    // "RevistaProgresiv": "https://revistaprogresiv.ro/", //https://revistaprogresiv.ro/retail/
     // "euractiv": "https://www.euractiv.ro/",
     // "Retail.ro": "https://www.retail.ro/",
-
-    //VERIFY
     // "RevistaBIZ": "https://www.revistabiz.ro/",
     // "360medical.ro": "https://www.360medical.ro/",
-    // "MedicalNews": "https://www.medicalnews.ro/",
-    // "UniversulJuridic.ro": "https://www.universuljuridic.ro/",
     // "Edupedu": "https://www.edupedu.ro/",
+
 
     // Dynamic, can't scrape
     // "WallStreetRomania": "https://www.wall-street.ro/",
@@ -41,6 +36,9 @@ class Globals {
     // "avocatnet.ro": "https://www.avocatnet.ro/",
     // "ZiarulFinanciar": "https://www.zf.ro/",
     // "rfi": "https://www.rfi.fr/ro/", //romania, europa, international
+    // "MedicalNews": "https://www.medicalnews.ro/", // Not loading at all
+    // "UniversulJuridic.ro": "https://www.universuljuridic.ro/", // Not sure what news these are (looks more like opinion pieces)
+    // "Juridice.ro": "https://www.juridice.ro/", //https://www.juridice.ro/flux-informatii
   };
 
   static Map<String, List<String>> storyTypeKeywords = {

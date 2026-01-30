@@ -1,6 +1,10 @@
 import 'dart:async';
 
 import 'package:html/dom.dart';
+import 'package:news_aggregator/parsers/curs_de_guvernare_parser.dart';
+import 'package:news_aggregator/parsers/green_news_parser.dart';
+import 'package:news_aggregator/parsers/retail_fmcg_parser.dart';
+import 'package:news_aggregator/parsers/revista_progresiv_parser.dart';
 import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
@@ -9,9 +13,12 @@ import '../parsers/agerpres.dart';
 import '../parsers/antena3_parser.dart';
 import '../parsers/dc_news_parser.dart';
 import '../parsers/digi24_parser.dart';
+import '../parsers/economica_parser.dart';
+import '../parsers/forbes_parser.dart';
 import '../parsers/g4_media_parser.dart';
 import '../parsers/hot_news_parser.dart';
 import '../parsers/libertatea_parser.dart';
+import '../parsers/profit_parser.dart';
 import '../parsers/romania_tv_parser.dart';
 import '../parsers/stiri_pe_surse_parser.dart';
 import '../parsers/tvr_info_parser.dart';
@@ -98,19 +105,16 @@ class CrawlerService {
 
   Future<List<Article>> crawlSite(String url) async {
     try {
-      // Special handling for Digi24 - use dedicated parser
       if (url.contains('digi24.ro')) {
         final digi24Parser = Digi24Parser();
         return await digi24Parser.parse();
       }
 
-      // Special handling for Adevarul - use dedicated parser
       if (url.contains('adevarul.ro')) {
         final adevaruParser = AdevarulParser();
         return await adevaruParser.parse();
       }
 
-      // Special handling for TvrInfo - use dedicated parser
       if (url.contains('tvrinfo.ro')) {
         final tvrinfoParser = TvrInfoParser();
         return await tvrinfoParser.parse();
@@ -159,6 +163,41 @@ class CrawlerService {
       if (url.contains('g4media')) {
         final g4MediaParser = G4MediaParser();
         return await g4MediaParser.parse();
+      }
+
+      if (url.contains('profit')) {
+        final profitParser = ProfitParser();
+        return await profitParser.parse();
+      }
+
+      if (url.contains('greennews')) {
+        final greennewsParser = GreenNewsParser();
+        return await greennewsParser.parse();
+      }
+
+      if (url.contains('economica')) {
+        final economicaParser = EconomicaParser();
+        return await economicaParser.parse();
+      }
+
+      if (url.contains('forbes')) {
+        final forbesParser = ForbesParser();
+        return await forbesParser.parse();
+      }
+
+      if (url.contains('cursdeguvernare')) {
+        final cursDeGuvernareParser = CursDeGuvernareParser();
+        return await cursDeGuvernareParser.parse();
+      }
+
+      if (url.contains('retail-fmcg')) {
+        final retailFmcgParser = RetailFmcgParser();
+        return await retailFmcgParser.parse();
+      }
+
+      if (url.contains('revistaprogresiv')) {
+        final revistaProgresivParser = RevistaProgresivParser();
+        return await revistaProgresivParser.parse();
       }
 
       return [];

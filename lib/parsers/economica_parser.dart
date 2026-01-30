@@ -48,7 +48,7 @@ class EconomicaParser extends BaseParser {
       }
     }
 
-    print('✅ Economica: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
+    // print('✅ Economica: Parsed ${uniqueArticles.length} unique articles (Title & Date deduplicated)');
     // Return only the values of the map (the latest unique articles)
     return uniqueArticles.values.toList();
   }

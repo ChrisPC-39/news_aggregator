@@ -37,9 +37,9 @@ class RomaniaTVParser extends BaseParser {
       }
     }
 
-    print(
-      '✅ RomaniaTV: Parsed ${allArticles.length} unique articles (deduplicated)',
-    );
+    // print(
+    //   '✅ RomaniaTV: Parsed ${allArticles.length} unique articles (deduplicated)',
+    // );
     return allArticles;
   }
 
@@ -50,7 +50,7 @@ class RomaniaTVParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -68,7 +68,7 @@ class RomaniaTVParser extends BaseParser {
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final nodes = document.querySelectorAll('div.article');
 
-    print('📦 Found ${nodes.length} articles on $url');
+    // print('📦 Found ${nodes.length} articles on $url');
 
     for (final article in nodes) {
       try {
@@ -123,7 +123,7 @@ class RomaniaTVParser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

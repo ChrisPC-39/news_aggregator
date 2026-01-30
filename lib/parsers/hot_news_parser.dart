@@ -69,7 +69,7 @@ class HotNewsParser extends BaseParser {
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final articleNodes = document.querySelectorAll('article');
 
-    print('📦 Found ${articleNodes.length} articles on $url');
+    // print('📦 Found ${articleNodes.length} articles on $url');
 
     for (final article in articleNodes) {
       try {
@@ -118,7 +118,7 @@ class HotNewsParser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

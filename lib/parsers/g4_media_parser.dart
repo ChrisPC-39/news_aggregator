@@ -32,8 +32,8 @@ class G4MediaParser extends BaseParser {
       }
     }
 
-    print(
-        '✅ G4Media: Parsed ${allArticles.length} unique articles');
+    // print(
+    //     '✅ G4Media: Parsed ${allArticles.length} unique articles');
     return allArticles;
   }
 
@@ -43,7 +43,7 @@ class G4MediaParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -64,7 +64,7 @@ class G4MediaParser extends BaseParser {
 
     final items = document.querySelectorAll('div.article');
 
-    print('📦 Found ${items.length} article blocks');
+    // print('📦 Found ${items.length} article blocks');
 
     for (final item in items) {
       try {
@@ -120,7 +120,7 @@ class G4MediaParser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

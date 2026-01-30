@@ -38,9 +38,9 @@ class LibertateaParser extends BaseParser {
       }
     }
 
-    print(
-      '✅ Libertatea: Parsed ${allArticles.length} unique articles (deduplicated)',
-    );
+    // print(
+    //   '✅ Libertatea: Parsed ${allArticles.length} unique articles (deduplicated)',
+    // );
     return allArticles;
   }
 
@@ -51,7 +51,7 @@ class LibertateaParser extends BaseParser {
       ) async {
     final List<Article> articles = [];
 
-    print('🔍 Fetching $url');
+    // print('🔍 Fetching $url');
 
     final response = await http.get(
       Uri.parse(url),
@@ -69,7 +69,7 @@ class LibertateaParser extends BaseParser {
     final document = parser.parse(utf8.decode(response.bodyBytes));
     final nodes = document.querySelectorAll('div.news-item');
 
-    print('📦 Found ${nodes.length} articles on $url');
+    // print('📦 Found ${nodes.length} articles on $url');
 
     for (final item in nodes) {
       try {
@@ -114,7 +114,7 @@ class LibertateaParser extends BaseParser {
       }
     }
 
-    print('✅ Parsed ${articles.length} articles from $url');
+    // print('✅ Parsed ${articles.length} articles from $url');
     return articles;
   }
 

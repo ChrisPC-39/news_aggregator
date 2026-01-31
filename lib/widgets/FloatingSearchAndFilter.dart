@@ -14,6 +14,8 @@ class FloatingSearchAndFilter extends StatefulWidget {
   final Function(String) onSearchChanged;
   final VoidCallback onClearSearch;
   final FocusNode? searchFocusNode;
+  final bool showSavedOnly;
+  final Function(bool) onSavedOnlyToggled;
 
   const FloatingSearchAndFilter({
     super.key,
@@ -28,6 +30,8 @@ class FloatingSearchAndFilter extends StatefulWidget {
     required this.onClearSearch,
     required this.selectedSources,
     required this.onSourceToggled,
+    required this.showSavedOnly,
+    required this.onSavedOnlyToggled,
     this.searchFocusNode,
   });
 
@@ -73,6 +77,25 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Saved Only Toggle
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Show Bookmarked Only',
+                                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    Switch(
+                                      value: widget.showSavedOnly,
+                                      activeColor: Colors.deepPurple,
+                                      onChanged: (value) => widget.onSavedOnlyToggled(value),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(color: Colors.white10, height: 24), // Separator
                                 // Category label
                                 Text(
                                   'Categories',
@@ -234,7 +257,9 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
               // Inside Globals.allSources.map(...)
               final sourceId = sourceName.toLowerCase();
               final isSelected = widget.selectedSources.contains(sourceId);
-              final imageName = sourceId.replaceAll('.ro', '').replaceAll('.net', '');
+              final imageName = sourceId
+                  .replaceAll('.ro', '')
+                  .replaceAll('.net', '');
 
               return SizedBox(
                 width: 65,

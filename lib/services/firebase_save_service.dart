@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:news_aggregator/services/summary_service.dart';
 
 import '../models/news_story_model.dart';
 
@@ -39,18 +38,6 @@ class FirebaseSaveService {
       },
       SetOptions(merge: true), // creates the doc if it doesn't exist
     );
-
-    // Generate summary and patch it back in.
-    // try {
-    //   final summary = await _summaryService.generateSummary(story);
-    //
-    //   await docRef.update({
-    //     FieldPath(['stories', storyKey, 'aiSummary']): summary,
-    //   });
-    // } catch (e) {
-    //   // Story is already saved — log the error but don't throw,
-    //   // so the caller isn't blocked by a summarization failure.
-    // }
   }
 
   /// Deletes a single story (by its canonicalTitle key) from the user doc.
@@ -79,28 +66,4 @@ class FirebaseSaveService {
         .map((json) => NewsStory.fromJson(json as Map<String, dynamic>))
         .toList();
   }
-
-  Future<void> updateStorySummary(String title, String summary) async {
-    await _userDoc().update({
-      FieldPath(['stories', title, 'aiSummary']): summary
-    });
-  }
-
-  Stream<Map<String, dynamic>?> watchStory(String title) {
-    return _userDoc().snapshots().map((doc) {
-      final stories = (doc.data())?['stories'] as Map<String, dynamic>?;
-      return stories?[title] as Map<String, dynamic>?;
-    }).distinct((prev, next) => mapEquals(prev, next)); // Only emit if the specific story map changed
-  }
-  // Stream<Map<String, dynamic>?> watchStory(String title) {
-  //   return _userDoc().snapshots().map((doc) {
-  //     if (!doc.exists) return null;
-  //
-  //     // Dig into the nested map: stories -> {title}
-  //     final data = doc.data();
-  //     final stories = data?['stories'] as Map<String, dynamic>?;
-  //
-  //     return stories?[title] as Map<String, dynamic>?;
-  //   });
-  // }
 }

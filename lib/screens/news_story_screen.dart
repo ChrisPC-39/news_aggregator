@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For compute()
 import 'package:intl/intl.dart';
@@ -9,7 +8,6 @@ import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../models/article_model.dart';
 import '../services/crawler_service.dart';
-import '../services/summary_service.dart';
 import '../services/v3_score_service.dart';
 import '../widgets/FloatingSearchAndFilter.dart';
 import 'grouped_news_screen.dart';
@@ -26,23 +24,26 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   double _lastScrollOffset = 1;
   String _searchQuery = '';
 
+  // Init services
+  final CrawlerService _crawlerService = CrawlerService();
+  final FirebaseSaveService _firebaseSaveService = FirebaseSaveService();
+
   final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final CrawlerService _crawlerService = CrawlerService();
 
+  // Init filters
   Set<String> selectedCategories = {};
   int minimumSources = 2;
+  bool showSavedOnly = false;
   Set<String> selectedSources =
       Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
 
   // Direct state instead of stream
   List<NewsStory> _stories = [];
   bool _isLoading = true;
-
   Set<String> _savedStoryTitles = {};
-  // final SummaryService _summaryService = SummaryService();
-  final FirebaseSaveService _firebaseSaveService = FirebaseSaveService();
+
 
   @override
   void initState() {
@@ -128,29 +129,12 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       } else {
         // 1. Save the initial story
         await _firebaseSaveService.saveStory(story);
-
-        // 2. Fire and forget the AI Summary generation
-        // We don't 'await' this so the UI stays responsive
-        // _generateAndUploadSummary(story);
       }
     } catch (e) {
       setState(() => isCurrentlySaved ? _savedStoryTitles.add(title) : _savedStoryTitles.remove(title));
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to update")));
     }
   }
-
-  // Future<void> _generateAndUploadSummary(NewsStory story) async {
-  //   try {
-  //     final summary = await _summaryService.generateSummary(story);
-  //     // Update the existing document in Firebase with the new field
-  //     await _firebaseSaveService.updateStorySummary(story.canonicalTitle, summary);
-  //
-  //     // Refresh the local saved set if needed, though the Stream (step 2) is better
-  //     _fetchSavedStories();
-  //   } catch (e) {
-  //     debugPrint("AI Summary failed: $e");
-  //   }
-  // }
 
   // Run grouping in background isolate
   Future<List<NewsStory>> _groupArticlesInBackground(
@@ -262,28 +246,25 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
               searchController: _searchController,
               searchQuery: _searchQuery,
               searchFocusNode: _searchFocusNode,
+              // ADDED: Pass the saved filter state
+              showSavedOnly: showSavedOnly,
+              onSavedOnlyToggled: (value) {
+                setState(() {
+                  showSavedOnly = value;
+                });
+              },
               onSourceToggled: (source, isSelected) {
                 setState(() {
                   final allSources =
-                      Globals.sourceConfigs.keys
-                          .map((s) => s.toLowerCase())
-                          .toSet();
+                  Globals.sourceConfigs.keys
+                      .map((s) => s.toLowerCase())
+                      .toSet();
 
-                  // 1. If currently everything is selected, and we toggle one...
                   if (selectedSources.length == allSources.length) {
-                    // Switch to "Solo Mode" for the clicked source
                     selectedSources.clear();
                     selectedSources.add(source);
-                  }
-                  // 2. Normal toggle behavior
-                  else {
-                    if (isSelected) {
-                      selectedSources.add(source);
-                    } else {
-                      selectedSources.remove(source);
-                    }
-
-                    // 3. Reset to "All" if user unchecks the last item
+                  } else {
+                    isSelected ? selectedSources.add(source) : selectedSources.remove(source);
                     if (selectedSources.isEmpty) {
                       selectedSources.addAll(allSources);
                     }
@@ -379,33 +360,40 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   // Centralized filtering logic
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
-      // 1. Source Filter
+      // 1. Saved filter (High priority/Early exit)
+      // If showSavedOnly is enabled, exclude any story NOT in the _savedStoryTitles set
+      if (showSavedOnly && !_savedStoryTitles.contains(story.canonicalTitle)) {
+        return false;
+      }
+
+      // 2. Source Filter
       final storySourceIds =
-          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+      story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
       final hasActiveSource = storySourceIds.any(
-        (id) => selectedSources.contains(id),
+            (id) => selectedSources.contains(id),
       );
       if (!hasActiveSource) return false;
 
-      // 2. Category Filter
+      // 3. Category Filter
       if (selectedCategories.isNotEmpty) {
         final allTypes = <String>{
           ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
           ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
         };
+        // Check if the story contains ALL selected categories
         if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains)) {
           return false;
         }
       }
 
-      // 3. Minimum Sources Filter
-      final uniqueSources =
+      // 4. Minimum Sources Filter
+      final uniqueSourcesCount =
           story.articles.map((a) => a.sourceName).toSet().length;
-      if (uniqueSources < minimumSources) return false;
+      if (uniqueSourcesCount < minimumSources) return false;
 
-      // 4. Search Filter
+      // 5. Search Filter
       if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.trimRight();
+        final q = _searchQuery.toLowerCase().trim();
         return story.canonicalTitle.toLowerCase().contains(q) ||
             (story.summary?.toLowerCase().contains(q) ?? false);
       }

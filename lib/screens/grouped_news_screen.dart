@@ -6,8 +6,13 @@ import '../models/news_story_model.dart';
 
 class GroupedNewsScreen extends StatefulWidget {
   final NewsStory story;
+  final bool isSaved;
 
-  const GroupedNewsScreen({super.key, required this.story});
+  const GroupedNewsScreen({
+    super.key,
+    required this.story,
+    required this.isSaved,
+  });
 
   @override
   State<GroupedNewsScreen> createState() => _GroupedNewsScreenState();
@@ -54,12 +59,18 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen> {
           // 3. Updated Article Mapping
           ...articles.map((article) {
             return ListTile(
-              contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: 16,
+              ),
               title: Padding(
                 padding: const EdgeInsets.only(bottom: 4.0),
                 child: Text(
                   article.title,
-                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 15,
+                  ),
                 ),
               ),
               subtitle: Row(
@@ -72,8 +83,12 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen> {
                       width: 16,
                       height: 16,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.public, size: 16, color: Colors.grey),
+                      errorBuilder:
+                          (context, error, stackTrace) => const Icon(
+                            Icons.public,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -82,9 +97,9 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen> {
                   Text(
                     article.sourceName,
                     style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[400],
-                        fontWeight: FontWeight.bold
+                      fontSize: 12,
+                      color: Colors.grey[400],
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
 
@@ -101,7 +116,11 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen> {
                   ),
                 ],
               ),
-              trailing: Icon(Icons.open_in_new, size: 14, color: Colors.grey[700]),
+              trailing: Icon(
+                Icons.open_in_new,
+                size: 14,
+                color: Colors.grey[700],
+              ),
               onTap: () async {
                 final uri = Uri.parse(article.url);
                 if (!await launchUrl(uri)) {

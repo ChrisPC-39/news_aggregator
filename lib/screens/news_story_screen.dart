@@ -1,12 +1,15 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For compute()
 import 'package:intl/intl.dart';
+import 'package:news_aggregator/services/firebase_save_service.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../models/article_model.dart';
 import '../services/crawler_service.dart';
+import '../services/summary_service.dart';
 import '../services/v3_score_service.dart';
 import '../widgets/FloatingSearchAndFilter.dart';
 import 'grouped_news_screen.dart';
@@ -37,6 +40,10 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   List<NewsStory> _stories = [];
   bool _isLoading = true;
 
+  Set<String> _savedStoryTitles = {};
+  // final SummaryService _summaryService = SummaryService();
+  final FirebaseSaveService _firebaseSaveService = FirebaseSaveService();
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +61,14 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
 
     // Fetch and refresh in background
     _refreshNews();
+    _fetchSavedStories();
+  }
+
+  Future<void> _fetchSavedStories() async {
+    final savedStories = await _firebaseSaveService.fetchAllStories();
+    setState(() {
+      _savedStoryTitles = savedStories.map((s) => s.canonicalTitle).toSet();
+    });
   }
 
   Future<void> _refreshNews() async {
@@ -90,6 +105,52 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       }
     }
   }
+
+  bool checkLocalSavedStatus(NewsStory story) {
+    return _savedStoryTitles.contains(story.canonicalTitle);
+  }
+
+  Future<void> toggleBookmark(NewsStory story) async {
+    final title = story.canonicalTitle;
+    final isCurrentlySaved = _savedStoryTitles.contains(title);
+
+    setState(() {
+      if (isCurrentlySaved) {
+        _savedStoryTitles.remove(title);
+      } else {
+        _savedStoryTitles.add(title);
+      }
+    });
+
+    try {
+      if (isCurrentlySaved) {
+        await _firebaseSaveService.deleteStory(title);
+      } else {
+        // 1. Save the initial story
+        await _firebaseSaveService.saveStory(story);
+
+        // 2. Fire and forget the AI Summary generation
+        // We don't 'await' this so the UI stays responsive
+        // _generateAndUploadSummary(story);
+      }
+    } catch (e) {
+      setState(() => isCurrentlySaved ? _savedStoryTitles.add(title) : _savedStoryTitles.remove(title));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to update")));
+    }
+  }
+
+  // Future<void> _generateAndUploadSummary(NewsStory story) async {
+  //   try {
+  //     final summary = await _summaryService.generateSummary(story);
+  //     // Update the existing document in Firebase with the new field
+  //     await _firebaseSaveService.updateStorySummary(story.canonicalTitle, summary);
+  //
+  //     // Refresh the local saved set if needed, though the Stream (step 2) is better
+  //     _fetchSavedStories();
+  //   } catch (e) {
+  //     debugPrint("AI Summary failed: $e");
+  //   }
+  // }
 
   // Run grouping in background isolate
   Future<List<NewsStory>> _groupArticlesInBackground(
@@ -203,7 +264,10 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
               searchFocusNode: _searchFocusNode,
               onSourceToggled: (source, isSelected) {
                 setState(() {
-                  final allSources = Globals.sourceConfigs.keys.map((s) => s.toLowerCase()).toSet();
+                  final allSources =
+                      Globals.sourceConfigs.keys
+                          .map((s) => s.toLowerCase())
+                          .toSet();
 
                   // 1. If currently everything is selected, and we toggle one...
                   if (selectedSources.length == allSources.length) {
@@ -300,7 +364,13 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
           final story = stories[index];
           final sources = story.articles.map((a) => a.sourceName).toList();
 
-          return buildNewsStoryCard(context, story, sources);
+          return buildNewsStoryCard(
+            context,
+            story,
+            sources,
+            checkLocalSavedStatus(story),
+            () => toggleBookmark(story),
+          );
         },
       ),
     );
@@ -348,19 +418,16 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     BuildContext context,
     NewsStory story,
     List<String> sources,
+    bool isSaved, // Pass current saved state
+    VoidCallback onBookmarkToggle, // Handle the logic update
   ) {
     final manualTypes = story.storyTypes ?? [];
     final aiTypes = story.inferredStoryTypes ?? [];
-
     final articles = story.articles;
-
-    // Get unique source names
     final uniqueSources = articles.map((a) => a.sourceName).toSet().toList();
 
     // Find date range
-    final dates = articles.map((a) => a.publishedAt).toList();
-    dates.sort();
-
+    final dates = articles.map((a) => a.publishedAt).toList()..sort();
     final String dateDisplay;
 
     if (dates.isEmpty) {
@@ -368,14 +435,12 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
     } else {
       final firstDate = dates.first;
       final lastDate = dates.last;
-
       if (DateFormat('yyyyMMdd').format(firstDate) ==
           DateFormat('yyyyMMdd').format(lastDate)) {
         dateDisplay = timeago.format(lastDate);
       } else {
-        final String firstDateStr = DateFormat('MMM d').format(firstDate);
-        final String lastDateStr = DateFormat('MMM d').format(lastDate);
-        dateDisplay = "$firstDateStr - $lastDateStr";
+        dateDisplay =
+            "${DateFormat('MMM d').format(firstDate)} - ${DateFormat('MMM d').format(lastDate)}";
       }
     }
 
@@ -384,15 +449,21 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       elevation: 4,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => GroupedNewsScreen(story: story)),
-          );
-        },
+        onTap:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (_) => GroupedNewsScreen(
+                      story: story,
+                      isSaved: checkLocalSavedStatus(story),
+                    ),
+              ),
+            ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Image and Tags Section
             SizedBox(
               width: double.infinity,
               height:
@@ -442,17 +513,20 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  if (story.summary != null) const SizedBox(height: 8),
-                  if (story.summary != null)
+
+                  if (story.summary != null) ...[
+                    const SizedBox(height: 8),
                     Text(
                       story.summary!,
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: Colors.white60),
                     ),
-                  if (story.summary != null) const SizedBox(height: 16),
+                  ],
+                  const SizedBox(height: 16),
                   Row(
                     children: [
+                      // Source Avatars
                       SizedBox(
                         height: 24,
                         width: (uniqueSources.length * 14.0) + 10,
@@ -492,6 +566,15 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                             fontSize: 11,
                           ),
                         ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          isSaved ? Icons.bookmark : Icons.bookmark_border,
+                          color: isSaved ? Colors.green[400] : Colors.white70,
+                          size: 20,
+                        ),
+                        onPressed: onBookmarkToggle,
                       ),
                     ],
                   ),

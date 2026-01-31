@@ -134,21 +134,7 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                                 const SizedBox(height: 8),
 
                                 // Minimum sources chips
-                                SegmentedButton<int>(
-                                  segments: const [
-                                    ButtonSegment(value: 1, label: Text('All')),
-                                    ButtonSegment(value: 2, label: Text('2+')),
-                                    ButtonSegment(value: 3, label: Text('3+')),
-                                    ButtonSegment(value: 5, label: Text('5+')),
-                                    ButtonSegment(value: 7, label: Text('7+')),
-                                    ButtonSegment(value: 9, label: Text('9+')),
-                                  ],
-                                  selected: {widget.minimumSources},
-                                  onSelectionChanged: (Set<int> newSelection) {
-                                    widget.onMinimumSourcesChanged(newSelection.first);
-                                  },
-                                  showSelectedIcon: false,
-                                ),
+                                _buildMinSourcesCount(),
 
                                 const SizedBox(height: 16),
 
@@ -218,6 +204,24 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMinSourcesCount() {
+    return SegmentedButton<int>(
+      segments: const [
+        ButtonSegment(value: 1, label: Text('All')),
+        ButtonSegment(value: 2, label: Text('2+')),
+        ButtonSegment(value: 3, label: Text('3+')),
+        ButtonSegment(value: 5, label: Text('5+')),
+        ButtonSegment(value: 7, label: Text('7+')),
+        ButtonSegment(value: 9, label: Text('9+')),
+      ],
+      selected: {widget.minimumSources},
+      onSelectionChanged: (Set<int> newSelection) {
+        widget.onMinimumSourcesChanged(newSelection.first);
+      },
+      showSelectedIcon: false,
     );
   }
 

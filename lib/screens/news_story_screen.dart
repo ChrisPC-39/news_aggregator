@@ -401,7 +401,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                     : const SizedBox.shrink(),
           ),
         ),
-        drawer: CustomDrawer(),
+        drawer: CustomDrawer(isPremium: widget.isPremium),
         body: Stack(
           children: [
             _buildBody(filteredStories),

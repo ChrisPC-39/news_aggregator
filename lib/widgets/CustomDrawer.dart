@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart'; // Ensure this path is correct
 
 class CustomDrawer extends StatelessWidget {
-  const CustomDrawer({super.key});
+  final bool isPremium;
+
+  const CustomDrawer({super.key, required this.isPremium});
 
   @override
   Widget build(BuildContext context) {
@@ -110,8 +112,8 @@ class CustomDrawer extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const Text(
-            "Member",
+          Text(
+            isPremium ? "Premium Account" : "Member",
             style: TextStyle(color: Color(0xFFA78BFA), fontSize: 12, fontWeight: FontWeight.w500),
           ),
         ],

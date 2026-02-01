@@ -7,7 +7,7 @@ class SummaryService {
     // 1. Format the content from your model
     // Assuming NewsStory has a list of articles with a 'content' or 'body' field
     final articleTexts = story.articles
-        .map((a) => "Title: ${a.title}\nContent: ${a.content}")
+        .map((a) => "Title: ${a.title}\nContent: ${a.content}\nURL: ${a.url}\nSource: ${a.sourceName}")
         .join('\n\n---\n\n');
 
     final prompt = '''
@@ -15,13 +15,13 @@ Ești un editor de știri imparțial. Rezumă următoarele articole într-un sin
 
 INSTRUCȚIUNI STRICTE:
 1. Limba: Răspunde exclusiv în limba română.
-2. Format: Returnează doar text simplu (plain text). Nu folosi Markdown, caractere de tip bold (**), liste cu puncte sau titluri.
+2. Format: Returnează doar text simplu (plain text). Nu folosi Markdown, caractere de tip bold (**) sau titluri. Poti folosi linii noi.
 3. Obiectivitate: Identifică orice urmă de subiectivism sau părtinire (bias) din sursele oferite.
 
 STRUCTURA RĂSPUNSULUI:
 - Paragraful cu rezumatul.
 - O linie goală.
-- O listă la final unde enumeri bias-urile identificate pentru fiecare sursă în parte.
+- O listă la final unde enumeri bias-urile identificate pentru fiecare sursă în parte, intr-o lista sub forma de bullet points.
 
 ARTICOLE DE ANALIZAT:
 $articleTexts

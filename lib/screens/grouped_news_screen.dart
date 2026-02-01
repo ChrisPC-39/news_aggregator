@@ -90,7 +90,10 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
             child: Container(color: Colors.black.withValues(alpha: 0.2)),
           ),
         ),
-        title: Text('Coverage', style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
+        title: Text(
+          'Coverage',
+          style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
             icon: Icon(
@@ -106,8 +109,8 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
         children: [
           // Background image
           Positioned.fill(
-            child: Image.network(
-              'https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&q=80&w=2070',
+            child: Image.asset(
+              'assets/images/background.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -116,9 +119,7 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.65),
-              ),
+              child: Container(color: Colors.black.withValues(alpha: 0.65)),
             ),
           ),
 
@@ -127,8 +128,7 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
             padding: const EdgeInsets.fromLTRB(16, 120, 16, 40),
             children: [
               // --- Hero image ---
-              if (widget.story.imageUrl != null)
-                _buildHeroImage(),
+              if (widget.story.imageUrl != null) _buildHeroImage(),
 
               const SizedBox(height: 24),
 
@@ -147,7 +147,11 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
               if (widget.story.summary != null)
                 Text(
                   widget.story.summary!,
-                  style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.5),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
                 ),
 
               const SizedBox(height: 32),
@@ -162,7 +166,11 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
               // --- Sources header ---
               Row(
                 children: [
-                  const Icon(Icons.article_outlined, color: Colors.white54, size: 20),
+                  const Icon(
+                    Icons.article_outlined,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'DETAILED SOURCES',
@@ -190,7 +198,9 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
@@ -223,19 +233,19 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
         _summaryListener = _firebaseSaveService
             .watchStory(widget.story.canonicalTitle)
             .listen((data) {
-          final summary = data?['aiSummary'] as String?;
-          if (summary != null && summary.isNotEmpty) {
-            if (mounted) {
-              setState(() {
-                _aiSummary = summary;
-                _startAppropriateAnimation();
-              });
-            }
-            // Summary arrived — cancel and clean up.
-            _summaryListener?.cancel();
-            _summaryListener = null;
-          }
-        });
+              final summary = data?['aiSummary'] as String?;
+              if (summary != null && summary.isNotEmpty) {
+                if (mounted) {
+                  setState(() {
+                    _aiSummary = summary;
+                    _startAppropriateAnimation();
+                  });
+                }
+                // Summary arrived — cancel and clean up.
+                _summaryListener?.cancel();
+                _summaryListener = null;
+              }
+            });
       }
       // else: just bookmarked but not premium — nothing extra to do.
     });
@@ -249,9 +259,12 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: summary == null
-                  ? Colors.purpleAccent.withValues(alpha: _shimmerAnimation.value)
-                  : Colors.white.withValues(alpha: 0.1),
+              color:
+                  summary == null
+                      ? Colors.purpleAccent.withValues(
+                        alpha: _shimmerAnimation.value,
+                      )
+                      : Colors.white.withValues(alpha: 0.1),
               width: 1.5,
             ),
             color: Colors.white.withValues(alpha: 0.05),
@@ -266,7 +279,11 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.auto_awesome, size: 18, color: Color(0xFFA78BFA)),
+                const Icon(
+                  Icons.auto_awesome,
+                  size: 18,
+                  color: Color(0xFFA78BFA),
+                ),
                 const SizedBox(width: 10),
                 Text(
                   summary != null ? 'AI INSIGHT' : 'GENERATING SUMMARY...',
@@ -314,7 +331,10 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
           splashColor: const Color(0xFFA78BFA).withValues(alpha: 0.1),
           focusColor: const Color(0xFFA78BFA).withValues(alpha: 0.05),
 
-          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: 16,
+          ),
           title: Text(
             article.title,
             style: GoogleFonts.lexend(
@@ -331,16 +351,16 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
                   radius: 10,
                   backgroundColor: Colors.white10,
                   backgroundImage: AssetImage(
-                      'assets/images/${article.sourceName.toLowerCase().replaceAll('.ro', '').replaceAll('.net', '')}.png'
+                    'assets/images/${article.sourceName.toLowerCase().replaceAll('.ro', '').replaceAll('.net', '')}.png',
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   article.sourceName,
                   style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.white38,
-                      fontWeight: FontWeight.bold
+                    fontSize: 11,
+                    color: Colors.white38,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 const Text("  •  ", style: TextStyle(color: Colors.white24)),
@@ -351,13 +371,17 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
               ],
             ),
           ),
-          trailing: const Icon(Icons.open_in_new, size: 14, color: Colors.white24),
+          trailing: const Icon(
+            Icons.open_in_new,
+            size: 14,
+            color: Colors.white24,
+          ),
           onTap: () async {
             final uri = Uri.parse(article.url);
             if (!await launchUrl(uri)) {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Could not open link'))
+                  const SnackBar(content: Text('Could not open link')),
                 );
               }
             }
@@ -384,7 +408,10 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
     return Container(
       height: 14,
       width: widthFraction == double.infinity ? double.infinity : null,
-      constraints: widthFraction != double.infinity ? BoxConstraints(maxWidth: 240 * widthFraction) : null,
+      constraints:
+          widthFraction != double.infinity
+              ? BoxConstraints(maxWidth: 240 * widthFraction)
+              : null,
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(4),

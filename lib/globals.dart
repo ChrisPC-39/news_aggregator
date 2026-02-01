@@ -1,4 +1,14 @@
 class Globals {
+  static String normalizeDiacritics(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll('ă', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('î', 'i')
+        .replaceAll('ș', 's')
+        .replaceAll('ț', 't');
+  }
+
   static final Map<String, String> sourceConfigs = {
     "Adevarul": "https://adevarul.ro/",
     "Agerpres": "https://agerpres.ro/",
@@ -39,7 +49,7 @@ class Globals {
   };
 
   static Map<String, List<String>> storyTypeKeywords = {
-    'General' : [],
+    'General': [],
 
     'Politică internă': [
       // Single words - Romanian specific
@@ -47,10 +57,14 @@ class Globals {
       'premier', 'presedinte', 'politic', 'partid', 'coalitie',
       'opozitie', 'deputat', 'senator', 'vot', 'protest',
       'motiune', 'decret', 'ordonanta', 'primarie', 'consiliu',
-      'legislativ', 'justitie', 'campanie', 'bolojan'
-
-      // Multi-word phrases - explicitly Romanian
-      'guvernul romaniei', 'guvernul de la bucuresti', 'executiv bucuresti',
+      'legislativ',
+      'justitie',
+      'campanie',
+      'bolojan'
+          // Multi-word phrases - explicitly Romanian
+          'guvernul romaniei',
+      'guvernul de la bucuresti',
+      'executiv bucuresti',
       'prim ministru', 'prim-ministru', 'presedinte al romaniei',
       'presedintele romaniei', 'klaus iohannis', 'palatul cotroceni',
       'ministrul de interne', 'ministrul justitiei', 'ministrul de externe',
@@ -77,7 +91,7 @@ class Globals {
       'opozitia parlamentara', 'puterea de la bucuresti',
       'institutii romanesti', 'autoritati romane', 'oficiali romani',
       'liderii politici romani', 'clasa politica romaneasca', 'armatei romane',
-      'la bucuresti'
+      'la bucuresti',
     ],
 
     'World': [
@@ -88,8 +102,11 @@ class Globals {
       'ambasador', 'frontiera', 'granita', 'iran', 'america',
       'iraq', 'israel', 'gaza', 'syria', 'ungaria', 'suedia', 'orban', 'ucrain',
       'reinarmare'
-      // Multi-word phrases - international focus
-      'uniunea europeana', 'uniune europeana', 'statele unite', 'putere',
+          // Multi-word phrases - international focus
+          'uniunea europeana',
+      'uniune europeana',
+      'statele unite',
+      'putere',
       'statele unite ale americii', 'casa alba', 'presedintele sua',
       'presedintele rusiei', 'vladimir putin', 'razboi in ucraina',
       'conflict armat', 'conflict militar', 'invazie rusa',
@@ -166,7 +183,7 @@ class Globals {
       'pret gaze', 'pret curent', 'pret petrol', 'baril petrol',
       'companie energetica', 'startup tehnologic', 'investitor angel',
       'capital de risc', 'finantare seed', 'turnoveri', 'cifra de afaceri',
-      'blockchain technology', 'crypto monede'
+      'blockchain technology', 'crypto monede',
     ],
 
     'Entertainment': [
@@ -205,7 +222,7 @@ class Globals {
       'celebritate mondiala', 'actrita premiata', 'actor premiat',
       'regizor premiat', 'cantaret de succes', 'castigator grammy',
       'artist consacrat', 'cariera artistica', 'viata personala',
-      'viata amoroasa', 'imagine publica'
+      'viata amoroasa', 'imagine publica',
     ],
 
     'Știință și Tehnologie': [
@@ -254,7 +271,7 @@ class Globals {
       'data center', 'server cloud', '5g network',
       'retea 5g', 'tehnologie 5g', 'laptop nou', 'procesor nou',
       'placa video', 'gpu', 'procesor intel', 'procesor amd',
-      'chip procesor', 'semiconductori', 'microchip'
+      'chip procesor', 'semiconductori', 'microchip',
     ],
 
     'Health': [
@@ -305,7 +322,7 @@ class Globals {
       'accident vascular', 'avc', 'diabet zaharat', 'cancer',
       'tumoare maligna', 'tratament oncologic', 'chimioterapie',
       'radioterapie', 'imunoterapie', 'boala alzheimer',
-      'boala parkinson', 'scleroza multipla'
+      'boala parkinson', 'scleroza multipla',
     ],
 
     'Sport': [
@@ -374,7 +391,7 @@ class Globals {
       'mma', 'kempo', 'volei', 'polo pe apa', 'schi',
       'patinaj', 'hochei pe gheata', 'bob', 'sanie',
       'biatlon', 'sarituri cu schiurile', 'sportivi de performanta',
-      'doping sportiv', 'dopaj'
+      'doping sportiv', 'dopaj',
     ],
 
     'Vreme': [
@@ -435,7 +452,7 @@ class Globals {
       'zona montana', 'zona de munte', 'peste 1800 metrii',
       'la munte', 'la altitudini', 'regiuni montane', 'carpatii',
       'zona de câmpie', 'zona de deal', 'regiuni de câmpie',
-      'vest tarii', 'est tarii', 'nord tarii', 'sud tarii'
+      'vest tarii', 'est tarii', 'nord tarii', 'sud tarii',
     ],
   };
 
@@ -458,16 +475,35 @@ class Globals {
 
     'World': [
       // Exclude Romanian internal politics
-      'guvernul romaniei', 'parlamentul romaniei', 'presedintele romaniei',
-      'klaus iohannis', 'palatul cotroceni', 'camera deputatilor',
-      'prim ministru roman', 'prim-ministru roman', 'guvern de la bucuresti',
-      'ministru roman', 'coalitie de guvernare', 'coalitia psd-pnl',
-      'marcel ciolacu', 'nicolae ciuca', 'nicusor dan', 'gabriela firea',
-      'parlament de la bucuresti', 'curtea constitutionala',
-      'politica romaneasca', 'scena politica romaneasca',
-      'psd', 'pnl', 'usr', 'aur', 'udmr',
-      'alegeri locale', 'alegeri parlamentare romanesti',
-      'alegeri prezidentiale romania', 'la bucuresti',
+      'guvernul romaniei',
+      'parlamentul romaniei',
+      'presedintele romaniei',
+      'klaus iohannis',
+      'palatul cotroceni',
+      'camera deputatilor',
+      'prim ministru roman',
+      'prim-ministru roman',
+      'guvern de la bucuresti',
+      'ministru roman',
+      'coalitie de guvernare',
+      'coalitia psd-pnl',
+      'marcel ciolacu',
+      'nicolae ciuca',
+      'nicusor dan',
+      'gabriela firea',
+      'parlament de la bucuresti',
+      'curtea constitutionala',
+      'politica romaneasca',
+      'scena politica romaneasca',
+      'psd',
+      'pnl',
+      'usr',
+      'aur',
+      'udmr',
+      'alegeri locale',
+      'alegeri parlamentare romanesti',
+      'alegeri prezidentiale romania',
+      'la bucuresti',
       // Keep "romania in nato" and "romania in ue" in World, so don't exclude them
     ],
     'Business': [
@@ -510,9 +546,14 @@ class Globals {
     'Vreme': [
       // Exclude climate change politics/policy
       'politici climatice', 'summit climatic', 'acord climatic',
-      'politica de mediu', 'trump', 'putin', 'razboi'
-      // Exclude disaster response (that's politics/world news)
-      'stare de urgenta', 'declaratie de dezastru', 'ajutor guvernamental',
+      'politica de mediu',
+      'trump',
+      'putin',
+      'razboi'
+          // Exclude disaster response (that's politics/world news)
+          'stare de urgenta',
+      'declaratie de dezastru',
+      'ajutor guvernamental',
     ],
   };
 }

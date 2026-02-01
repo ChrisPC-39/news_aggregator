@@ -15,6 +15,7 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLogin = true;
+  bool _obscurePassword = true;
 
   void _toggleMode() {
     setState(() {
@@ -275,7 +276,7 @@ class _LoginPageState extends State<LoginPage> {
   }) {
     return TextField(
       controller: controller,
-      obscureText: isPwd,
+      obscureText: _obscurePassword,
       style: const TextStyle(color: Colors.white),
       keyboardType: !isPwd ? TextInputType.emailAddress : TextInputType.text,
       textCapitalization: TextCapitalization.none,
@@ -287,6 +288,19 @@ class _LoginPageState extends State<LoginPage> {
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.05),
         contentPadding: const EdgeInsets.symmetric(vertical: 20),
+        suffixIcon: isPwd
+            ? IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+            color: Colors.white70,
+          ),
+          onPressed: () {
+            setState(() {
+              _obscurePassword = !_obscurePassword;
+            });
+          },
+        )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
           borderSide: BorderSide.none,

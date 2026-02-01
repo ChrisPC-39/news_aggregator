@@ -50,6 +50,7 @@ dependencies:
   google_sign_in: ^7.2.0
   flutter_animate: ^4.5.2
   google_fonts: ^6.3.2
+  firebase_ai: ^3.7.0
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:news_aggregator/screens/grouped_news_screen.dart';
 import 'package:news_aggregator/screens/login_screen.dart';
 import 'package:news_aggregator/screens/news_story_screen.dart';
 
@@ -65,7 +66,7 @@ class MyApp extends StatelessWidget {
         builder: (context, snapshot) {
           // If the snapshot has data, the user is logged in
           if (snapshot.hasData) {
-            return const GroupedNewsResultsPage();
+            return const NewsStoryScreen();
           }
           // Otherwise, show the login page
           return const LoginPage();
@@ -73,7 +74,7 @@ class MyApp extends StatelessWidget {
       ),
       routes: {
         '/login': (context) => const LoginPage(),
-        '/home': (context) => const GroupedNewsResultsPage(),
+        '/home': (context) => const NewsStoryScreen(),
       },
     );
   }

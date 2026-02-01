@@ -1,24 +1,36 @@
+import 'dart:async';
+import 'dart:ui';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For compute()
-import 'package:intl/intl.dart';
-import 'package:timeago/timeago.dart' as timeago;
+import 'package:google_fonts/google_fonts.dart';
+import 'package:news_aggregator/widgets/CustomDrawer.dart';
 
 import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../models/article_model.dart';
+import '../services/auth_service.dart';
 import '../services/crawler_service.dart';
+import '../services/summary_service.dart';
+import '../services/firebase_save_service.dart';
 import '../services/v3_score_service.dart';
 import '../widgets/FloatingSearchAndFilter.dart';
+import '../widgets/NewsStoryCard.dart';
 import 'grouped_news_screen.dart';
 
-class GroupedNewsResultsPage extends StatefulWidget {
-  const GroupedNewsResultsPage({super.key});
+class NewsStoryScreen extends StatefulWidget {
+  const NewsStoryScreen({super.key});
 
   @override
-  State<GroupedNewsResultsPage> createState() => _GroupedNewsResultsPageState();
+  State<NewsStoryScreen> createState() => _NewsStoryScreenState();
 }
 
-class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
+class _NewsStoryScreenState extends State<NewsStoryScreen>
+    with SingleTickerProviderStateMixin {
+  // ---------------------------------------------------------------------------
+  // Search / filter / scroll state
+  // ---------------------------------------------------------------------------
   bool _showSearchBar = true;
   double _lastScrollOffset = 1;
   String _searchQuery = '';
@@ -26,57 +38,224 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
   final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final CrawlerService _crawlerService = CrawlerService();
 
   Set<String> selectedCategories = {};
   int minimumSources = 2;
+  bool showSavedOnly = false;
   Set<String> selectedSources =
       Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
 
-  // Direct state instead of stream
+  // ---------------------------------------------------------------------------
+  // News data
+  // ---------------------------------------------------------------------------
+  final CrawlerService _crawlerService = CrawlerService();
   List<NewsStory> _stories = [];
   bool _isLoading = true;
 
+  // ---------------------------------------------------------------------------
+  // Bookmark + summary state
+  //
+  // Key  = canonicalTitle
+  // Value = null   → saved, but AI summary hasn't arrived yet
+  //       = String → the summary text
+  //
+  // A title that is NOT in this map is simply not bookmarked.
+  // ---------------------------------------------------------------------------
+  final Map<String, String?> _savedStories = {};
+
+  /// Active one-shot subscriptions keyed by canonicalTitle.
+  /// Each subscription cancels itself once the summary arrives.
+  final Map<String, StreamSubscription<Map<String, dynamic>?>>
+  _summaryListeners = {};
+
+  final SummaryService _summaryService = SummaryService();
+  final FirebaseSaveService _firebaseSaveService = FirebaseSaveService();
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-
-    // Load initial cached stories synchronously
     _stories = _crawlerService.cache.load();
 
-    // Listen to processing status
     _crawlerService.isProcessing.listen((isProcessing) {
-      if (mounted) {
-        setState(() => _isLoading = isProcessing);
+      if (mounted) setState(() => _isLoading = isProcessing);
+    });
+
+    // _fetchSavedStories must run after _refreshNews so it compares against
+    // the final crawled list — otherwise _refreshNews overwrites _stories
+    // and wipes out any Firebase stories that were appended.
+    _refreshNews().then((_) => _fetchSavedStories());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    // Cancel every active one-shot listener.
+    for (final sub in _summaryListeners.values) {
+      sub.cancel();
+    }
+    _summaryListeners.clear();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Firebase: initial load of saved stories
+  // ---------------------------------------------------------------------------
+
+  /// Loads saved bookmark state from Firebase, and hydrates any stories
+  /// that exist in Firebase but are missing from the local crawled list.
+  Future<void> _fetchSavedStories() async {
+    final snapshot = await _firebaseSaveService.fetchRawStoriesMap();
+    if (!mounted) return;
+
+    final localTitles = _stories.map((s) => s.canonicalTitle).toSet();
+    final missingStories = <NewsStory>[];
+
+    setState(() {
+      _savedStories.clear();
+
+      for (final entry in snapshot.entries) {
+        final title = entry.key;
+        final storyData = entry.value as Map<String, dynamic>;
+
+        // Read the aiSummary directly from the raw map.
+        final aiSummary = storyData['aiSummary'] as String?;
+        _savedStories[title] =
+            (aiSummary != null && aiSummary.isNotEmpty) ? aiSummary : null;
+
+        // If this story isn't in the local crawled list, deserialize and
+        // collect it so we can append it below.
+        if (!localTitles.contains(title)) {
+          try {
+            missingStories.add(NewsStory.fromJson(storyData));
+          } catch (e) {
+            debugPrint('Failed to deserialize saved story "$title": $e');
+          }
+        }
+
+        // If the summary is still pending, open a one-shot listener so the
+        // card updates when it arrives.
+        if (_savedStories[title] == null) {
+          _listenForSummary(title);
+        }
+      }
+
+      // Append any stories that exist in Firebase but not locally.
+      if (missingStories.isNotEmpty) {
+        _stories.addAll(missingStories);
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bookmark toggle
+  // ---------------------------------------------------------------------------
+  Future<void> toggleBookmark(NewsStory story) async {
+    final title = story.canonicalTitle;
+    final isCurrentlySaved = _savedStories.containsKey(title);
+
+    // Optimistic update
+    setState(() {
+      if (isCurrentlySaved) {
+        _savedStories.remove(title);
+        // Cancel any pending listener for this title
+        _summaryListeners.remove(title)?.cancel();
+      } else {
+        // null = saved but summary pending
+        _savedStories[title] = null;
       }
     });
 
-    // Fetch and refresh in background
-    _refreshNews();
+    try {
+      if (isCurrentlySaved) {
+        await _firebaseSaveService.deleteStory(title);
+      } else {
+        await _firebaseSaveService.saveStory(story);
+      }
+    } catch (e) {
+      // Rollback only if the Firestore write itself failed.
+      setState(() {
+        if (isCurrentlySaved) {
+          _savedStories[title] = null; // restore as saved (summary unknown)
+        } else {
+          _savedStories.remove(title); // undo the optimistic add
+        }
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Failed to update")));
+      }
+      return; // don't proceed to summary generation if the write failed
+    }
+
+    // Only reached if the Firestore write succeeded.
+    // These are both fire-and-forget — failures here are logged internally
+    // and should never surface as "Failed to update".
+    if (!isCurrentlySaved) {
+      _generateAndUploadSummary(story);
+      _listenForSummary(title);
+    }
   }
 
+  /// Generates the AI summary and writes it to Firestore.
+  Future<void> _generateAndUploadSummary(NewsStory story) async {
+    try {
+      final summary = await _summaryService.generateSummary(story);
+      await _firebaseSaveService.updateStorySummary(
+        story.canonicalTitle,
+        summary,
+      );
+      // Note: we don't setState here — the one-shot listener in
+      // _listenForSummary will pick up the change and do it for us.
+    } catch (e) {
+      debugPrint("AI Summary generation failed: $e");
+    }
+  }
+
+  /// Opens a Firestore listener on the user doc. As soon as the summary
+  /// field for [title] is non-empty, it updates local state and cancels itself.
+  void _listenForSummary(String title) {
+    // If there's already a listener for this title, don't open another one.
+    if (_summaryListeners.containsKey(title)) return;
+
+    final sub = _firebaseSaveService.watchStory(title).listen((data) {
+      final summary = data?['aiSummary'] as String?;
+
+      if (summary != null && summary.isNotEmpty) {
+        // Summary has arrived — update state and tear down.
+        if (mounted) {
+          setState(() {
+            // Only update if still saved (user might have un-bookmarked)
+            if (_savedStories.containsKey(title)) {
+              _savedStories[title] = summary;
+            }
+          });
+        }
+        // Cancel and remove the listener — we no longer need it.
+        _summaryListeners.remove(title)?.cancel();
+      }
+      // If summary is still null, do nothing — wait for next event.
+    });
+
+    _summaryListeners[title] = sub;
+  }
+
+  // ---------------------------------------------------------------------------
+  // News refresh
+  // ---------------------------------------------------------------------------
   Future<void> _refreshNews() async {
     setState(() => _isLoading = true);
-
     try {
-      // Fetch all sources (parallel)
       await _crawlerService.fetchAllSources();
-
-      // Get articles
       final articles = _crawlerService.localRepo.getArticles();
-
-      // print('🔄 Starting grouping for ${articles.length} articles...');
-
-      // Run grouping in isolate to prevent UI freeze
       final grouped = await _groupArticlesInBackground(articles);
-
-      // print('✅ Grouping complete: ${grouped.length} stories');
-
-      // Save to cache
       await _crawlerService.cache.save(grouped);
 
-      // Update UI
       if (mounted) {
         setState(() {
           _stories = grouped;
@@ -84,40 +263,27 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
         });
       }
     } catch (e) {
-      print('❌ Error refreshing news: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      debugPrint('Error refreshing news: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Run grouping in background isolate
   Future<List<NewsStory>> _groupArticlesInBackground(
     List<Article> articles,
   ) async {
-    // Convert to JSON for serialization
     final articlesJson = articles.map((a) => a.toJson()).toList();
-
-    // Run in isolate
     final groupedJson = await compute(_groupArticlesIsolate, articlesJson);
-
-    // Convert back to objects
     return groupedJson.map((json) => NewsStory.fromJson(json)).toList();
   }
 
-  // Top-level function for isolate
   static List<Map<String, dynamic>> _groupArticlesIsolate(
     List<Map<String, dynamic>> articlesJson,
   ) {
-    // Reconstruct articles from JSON
     final articles =
         articlesJson.map((json) => Article.fromJson(json)).toList();
-
-    // Use ScoreService to group
     final scoreService = ScoreService();
     final grouped = scoreService.groupArticlesIncremental([], articles);
 
-    // Deduplicate
     for (var story in grouped) {
       final seen = <String>{};
       story.articles.retainWhere((article) {
@@ -129,30 +295,71 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       });
     }
     grouped.removeWhere((story) => story.articles.isEmpty);
-
-    // Convert to JSON for return
     return grouped.map((story) => story.toJson()).toList();
   }
 
+  // ---------------------------------------------------------------------------
+  // Scroll handling
+  // ---------------------------------------------------------------------------
   void _onScroll() {
     final offset = _scrollController.offset;
-
     if (offset < _lastScrollOffset && !_showSearchBar) {
       setState(() => _showSearchBar = true);
     } else if (offset > _lastScrollOffset && offset > 100 && _showSearchBar) {
       setState(() => _showSearchBar = false);
     }
-
     _lastScrollOffset = offset;
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _searchController.dispose();
-    super.dispose();
+  // ---------------------------------------------------------------------------
+  // Filtering
+  // ---------------------------------------------------------------------------
+  List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
+    return stories.where((story) {
+      // 1. Saved filter (High priority/Early exit)
+      if (showSavedOnly && !_savedStories.containsKey(story.canonicalTitle)) {
+        return false;
+      }
+
+      // 2. Source Filter
+      final storySourceIds =
+      story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+      final hasActiveSource = storySourceIds.any(
+            (id) => selectedSources.contains(id),
+      );
+      if (!hasActiveSource) return false;
+
+      // 3. Category Filter
+      if (selectedCategories.isNotEmpty) {
+        final allTypes = <String>{
+          ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
+          ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
+        };
+        // Check if the story contains ALL selected categories
+        if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains)) {
+          return false;
+        }
+      }
+
+      // 4. Minimum Sources Filter
+      final uniqueSourcesCount =
+          story.articles.map((a) => a.sourceName).toSet().length;
+      if (uniqueSourcesCount < minimumSources) return false;
+
+      // 5. Search Filter
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase().trim();
+        return story.canonicalTitle.toLowerCase().contains(q) ||
+            (story.summary?.toLowerCase().contains(q) ?? false);
+      }
+
+      return true;
+    }).toList();
   }
 
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final filteredStories = _applyAllFilters(_stories);
@@ -190,6 +397,7 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
                     : const SizedBox.shrink(),
           ),
         ),
+        drawer: CustomDrawer(),
         body: Stack(
           children: [
             _buildBody(filteredStories),
@@ -201,25 +409,27 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
               searchController: _searchController,
               searchQuery: _searchQuery,
               searchFocusNode: _searchFocusNode,
+              showSavedOnly: showSavedOnly,
+              onSavedOnlyToggled: (value) {
+                setState(() {
+                  showSavedOnly = value;
+                });
+              },
               onSourceToggled: (source, isSelected) {
                 setState(() {
-                  final allSources = Globals.sourceConfigs.keys.map((s) => s.toLowerCase()).toSet();
-
-                  // 1. If currently everything is selected, and we toggle one...
+                  final allSources =
+                      Globals.sourceConfigs.keys
+                          .map((s) => s.toLowerCase())
+                          .toSet();
                   if (selectedSources.length == allSources.length) {
-                    // Switch to "Solo Mode" for the clicked source
                     selectedSources.clear();
                     selectedSources.add(source);
-                  }
-                  // 2. Normal toggle behavior
-                  else {
+                  } else {
                     if (isSelected) {
                       selectedSources.add(source);
                     } else {
                       selectedSources.remove(source);
                     }
-
-                    // 3. Reset to "All" if user unchecks the last item
                     if (selectedSources.isEmpty) {
                       selectedSources.addAll(allSources);
                     }
@@ -294,259 +504,35 @@ class _GroupedNewsResultsPageState extends State<GroupedNewsResultsPage> {
       onRefresh: _refreshNews,
       child: ListView.builder(
         controller: _scrollController,
-        padding: const EdgeInsets.only(top: 8, bottom: 80, left: 8, right: 8),
+        padding: const EdgeInsets.only(top: 8, bottom: 80),
         itemCount: stories.length,
         itemBuilder: (context, index) {
           final story = stories[index];
-          final sources = story.articles.map((a) => a.sourceName).toList();
+          final title = story.canonicalTitle;
+          final isSaved = _savedStories.containsKey(title);
 
-          return buildNewsStoryCard(context, story, sources);
-        },
-      ),
-    );
-  }
-
-  // Centralized filtering logic
-  List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
-    return stories.where((story) {
-      // 1. Source Filter
-      final storySourceIds =
-          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
-      final hasActiveSource = storySourceIds.any(
-        (id) => selectedSources.contains(id),
-      );
-      if (!hasActiveSource) return false;
-
-      // 2. Category Filter
-      if (selectedCategories.isNotEmpty) {
-        final allTypes = <String>{
-          ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
-          ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
-        };
-        if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains)) {
-          return false;
-        }
-      }
-
-      // 3. Minimum Sources Filter
-      final uniqueSources =
-          story.articles.map((a) => a.sourceName).toSet().length;
-      if (uniqueSources < minimumSources) return false;
-
-      // 4. Search Filter
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.trimRight();
-        return story.canonicalTitle.toLowerCase().contains(q) ||
-            (story.summary?.toLowerCase().contains(q) ?? false);
-      }
-
-      return true;
-    }).toList();
-  }
-
-  Widget buildNewsStoryCard(
-    BuildContext context,
-    NewsStory story,
-    List<String> sources,
-  ) {
-    final manualTypes = story.storyTypes ?? [];
-    final aiTypes = story.inferredStoryTypes ?? [];
-
-    final articles = story.articles;
-
-    // Get unique source names
-    final uniqueSources = articles.map((a) => a.sourceName).toSet().toList();
-
-    // Find date range
-    final dates = articles.map((a) => a.publishedAt).toList();
-    dates.sort();
-
-    final String dateDisplay;
-
-    if (dates.isEmpty) {
-      dateDisplay = "No date";
-    } else {
-      final firstDate = dates.first;
-      final lastDate = dates.last;
-
-      if (DateFormat('yyyyMMdd').format(firstDate) ==
-          DateFormat('yyyyMMdd').format(lastDate)) {
-        dateDisplay = timeago.format(lastDate);
-      } else {
-        final String firstDateStr = DateFormat('MMM d').format(firstDate);
-        final String lastDateStr = DateFormat('MMM d').format(lastDate);
-        dateDisplay = "$firstDateStr - $lastDateStr";
-      }
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      elevation: 4,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => GroupedNewsScreen(story: story)),
+          return NewsStoryCard(
+            story: story,
+            isSaved: isSaved,
+            // null if not saved, or if saved but summary hasn't arrived
+            aiSummary: _savedStories[title],
+            onBookmarkToggle: () => toggleBookmark(story),
+            onTap:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (_) => GroupedNewsScreen(
+                          story: story,
+                          isSaved: isSaved,
+                          aiSummary:
+                              _savedStories[title] ?? "Loading",
+                          onBookmarkToggle: () => toggleBookmark(story),
+                        ),
+                  ),
+                ),
           );
         },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: double.infinity,
-              height:
-                  story.imageUrl != null && story.imageUrl!.isNotEmpty
-                      ? 200
-                      : 35,
-              child: Stack(
-                children: [
-                  if (story.imageUrl != null && story.imageUrl!.isNotEmpty)
-                    Image.network(
-                      story.imageUrl!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox(),
-                    ),
-                  if (manualTypes.isNotEmpty || aiTypes.isNotEmpty)
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      right: 12,
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          ...manualTypes.map(
-                            (type) => _buildTagChip(type, isAi: false),
-                          ),
-                          ...aiTypes.map(
-                            (type) => _buildTagChip(type, isAi: true),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    story.canonicalTitle,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (story.summary != null) const SizedBox(height: 8),
-                  if (story.summary != null)
-                    Text(
-                      story.summary!,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white60),
-                    ),
-                  if (story.summary != null) const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      SizedBox(
-                        height: 24,
-                        width: (uniqueSources.length * 14.0) + 10,
-                        child: Stack(
-                          children: List.generate(uniqueSources.length, (
-                            index,
-                          ) {
-                            return Positioned(
-                              left: index * 14.0,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.black,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: CircleAvatar(
-                                  radius: 10,
-                                  backgroundColor: Colors.grey[900],
-                                  backgroundImage: AssetImage(
-                                    'assets/images/${uniqueSources[index].toLowerCase().replaceAll('.ro', '').replaceAll('.net', '')}.png',
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "${uniqueSources.join(', ')} • $dateDisplay",
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTagChip(String label, {required bool isAi}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color:
-              isAi
-                  ? Colors.deepPurple.withValues(alpha: 0.85)
-                  : Colors.black.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: isAi ? Colors.deepPurple : Colors.white24,
-            width: 1,
-          ),
-          boxShadow:
-              isAi
-                  ? [
-                    BoxShadow(
-                      color: Colors.deepPurple.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                  : [],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isAi)
-              const Icon(Icons.auto_awesome, size: 12, color: Colors.white),
-            if (isAi) const SizedBox(width: 4),
-            Text(
-              label.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

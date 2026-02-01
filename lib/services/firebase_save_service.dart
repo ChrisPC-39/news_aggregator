@@ -8,7 +8,6 @@ import '../models/news_story_model.dart';
 class FirebaseSaveService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final SummaryService _summaryService = SummaryService();
 
   /// Returns the current user's document reference in the "users" collection.
   /// Throws a [StateError] if no user is signed in.
@@ -39,18 +38,6 @@ class FirebaseSaveService {
       },
       SetOptions(merge: true), // creates the doc if it doesn't exist
     );
-
-    // Generate summary and patch it back in.
-    try {
-      final summary = await _summaryService.generateSummary(story);
-
-      await docRef.update({
-        FieldPath(['stories', storyKey, 'aiSummary']): summary,
-      });
-    } catch (e) {
-      // Story is already saved — log the error but don't throw,
-      // so the caller isn't blocked by a summarization failure.
-    }
   }
 
   /// Deletes a single story (by its canonicalTitle key) from the user doc.
@@ -62,37 +49,6 @@ class FirebaseSaveService {
     } catch (e) {
       print('Error deleting story: $e');
     }
-  }
-
-  /// Returns all stories saved for the current user, or an empty list
-  /// if the document or the "stories" field doesn't exist.
-  Future<List<NewsStory>> fetchAllStories() async {
-    final snapshot = await _userDoc().get();
-    final data = snapshot.data();
-
-    if (data == null) return [];
-
-    final storiesMap = data['stories'] as Map<String, dynamic>?;
-    if (storiesMap == null) return [];
-
-    return storiesMap.values
-        .map((json) => NewsStory.fromJson(json as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// Returns the set of canonicalTitles for every story saved in Firebase.
-  /// Reads keys directly from the stories map — does not deserialize into
-  /// NewsStory, so it will never fail due to missing or changed model fields.
-  Future<Set<String>> fetchSavedTitles() async {
-    final snapshot = await _userDoc().get();
-    final data = snapshot.data();
-
-    if (data == null) return {};
-
-    final storiesMap = data['stories'] as Map<String, dynamic>?;
-    if (storiesMap == null) return {};
-
-    return storiesMap.keys.toSet();
   }
 
   Future<void> updateStorySummary(String title, String summary) async {
@@ -126,23 +82,4 @@ class FirebaseSaveService {
       return storiesMap?[canonicalTitle] as Map<String, dynamic>?;
     });
   }
-
-  // Stream<Map<String, dynamic>?> watchStory(String title) {
-  //   return _userDoc().snapshots().map((doc) {
-  //     final stories = (doc.data())?['stories'] as Map<String, dynamic>?;
-  //     return stories?[title] as Map<String, dynamic>?;
-  //   }).distinct((prev, next) => mapEquals(prev, next)); // Only emit if the specific story map changed
-  // }
-
-  // Stream<Map<String, dynamic>?> watchStory(String title) {
-  //   return _userDoc().snapshots().map((doc) {
-  //     if (!doc.exists) return null;
-  //
-  //     // Dig into the nested map: stories -> {title}
-  //     final data = doc.data();
-  //     final stories = data?['stories'] as Map<String, dynamic>?;
-  //
-  //     return stories?[title] as Map<String, dynamic>?;
-  //   });
-  // }
 }

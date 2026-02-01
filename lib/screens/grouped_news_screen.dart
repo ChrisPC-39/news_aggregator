@@ -12,6 +12,7 @@ import '../services/firebase_save_service.dart';
 class GroupedNewsScreen extends StatefulWidget {
   final NewsStory story;
   final bool isSaved;
+  final bool isPremium;
   final String? aiSummary;
   final VoidCallback onBookmarkToggle;
 
@@ -19,6 +20,7 @@ class GroupedNewsScreen extends StatefulWidget {
     super.key,
     required this.story,
     required this.isSaved,
+    required this.isPremium,
     required this.onBookmarkToggle,
     this.aiSummary,
   });
@@ -55,8 +57,10 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
     _startAppropriateAnimation();
   }
 
+  /// If premium + saved + no summary yet → repeat (loading pulse).
+  /// Otherwise → stop (either not saved, not premium, or summary already here).
   void _startAppropriateAnimation() {
-    if (_isSaved && _aiSummary == null) {
+    if (_isSaved && _aiSummary == null && widget.isPremium) {
       _shimmerController.repeat(reverse: true);
     } else {
       _shimmerController.stop();
@@ -100,7 +104,7 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
       ),
       body: Stack(
         children: [
-          // Background Romania Image (consistent with home screen)
+          // Background image
           Positioned.fill(
             child: Image.network(
               'https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&q=80&w=2070',
@@ -108,12 +112,12 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
             ),
           ),
 
-
+          // Blur overlay
           Positioned.fill(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Adjust blur
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
               child: Container(
-                color: Colors.black.withValues(alpha: 0.65), // Adjust darkness
+                color: Colors.black.withValues(alpha: 0.65),
               ),
             ),
           ),
@@ -149,7 +153,8 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
               const SizedBox(height: 32),
 
               // --- AI Summary card ---
-              if (_isSaved) ...[
+              // Only visible if saved AND the user is premium.
+              if (_isSaved && widget.isPremium) ...[
                 _buildAiSummaryCard(context, _aiSummary),
                 const SizedBox(height: 32),
               ],
@@ -203,13 +208,18 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
     widget.onBookmarkToggle();
     setState(() {
       _isSaved = !_isSaved;
+
       if (!_isSaved) {
+        // Un-bookmarked — tear everything down.
         _aiSummary = null;
         _summaryListener?.cancel();
         _summaryListener = null;
         _shimmerController.stop();
-      } else {
+      } else if (widget.isPremium) {
+        // Just bookmarked and user is premium — summary is pending.
+        // Start pulsing and open a one-shot listener for the summary.
         _startAppropriateAnimation();
+
         _summaryListener = _firebaseSaveService
             .watchStory(widget.story.canonicalTitle)
             .listen((data) {
@@ -221,11 +231,13 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
                 _startAppropriateAnimation();
               });
             }
+            // Summary arrived — cancel and clean up.
             _summaryListener?.cancel();
             _summaryListener = null;
           }
         });
       }
+      // else: just bookmarked but not premium — nothing extra to do.
     });
   }
 
@@ -293,13 +305,11 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
-      // Material is required for the InkWell splash to actually render
       child: Material(
         color: Colors.transparent,
-        clipBehavior: Clip.antiAlias, // Important: clips the splash to the border radius
+        clipBehavior: Clip.antiAlias,
         borderRadius: BorderRadius.circular(16),
         child: ListTile(
-          // Customizing the splash color to match your purple theme
           hoverColor: Colors.white.withValues(alpha: 0.05),
           splashColor: const Color(0xFFA78BFA).withValues(alpha: 0.1),
           focusColor: const Color(0xFFA78BFA).withValues(alpha: 0.05),

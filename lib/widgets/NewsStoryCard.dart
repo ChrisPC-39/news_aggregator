@@ -18,6 +18,13 @@ enum _BorderState {
 }
 
 class NewsStoryCard extends StatefulWidget {
+  final NewsStory story;
+  final bool isSaved;
+  final String? aiSummary;
+  final VoidCallback onBookmarkToggle;
+  final VoidCallback onTap;
+  final bool isPremium;
+
   const NewsStoryCard({
     super.key,
     required this.story,
@@ -28,13 +35,8 @@ class NewsStoryCard extends StatefulWidget {
     this.aiSummary,
     required this.onBookmarkToggle,
     required this.onTap,
+    required this.isPremium,
   });
-
-  final NewsStory story;
-  final bool isSaved;
-  final String? aiSummary;
-  final VoidCallback onBookmarkToggle;
-  final VoidCallback onTap;
 
   @override
   State<NewsStoryCard> createState() => _NewsStoryCardState();
@@ -52,9 +54,10 @@ class _NewsStoryCardState extends State<NewsStoryCard>
       vsync: this,
       duration: const Duration(seconds: 2),
     );
-    _borderOpacityAnimation = Tween<double>(begin: 0.1, end: 0.8).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _borderOpacityAnimation = Tween<double>(
+      begin: 0.1,
+      end: 0.8,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     _syncAnimationState();
   }
@@ -62,9 +65,10 @@ class _NewsStoryCardState extends State<NewsStoryCard>
   @override
   void didUpdateWidget(covariant NewsStoryCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Re-evaluate whenever saved state or summary changes.
+    // Re-evaluate whenever saved state, summary, or premium status changes.
     if (oldWidget.isSaved != widget.isSaved ||
-        oldWidget.aiSummary != widget.aiSummary) {
+        oldWidget.aiSummary != widget.aiSummary ||
+        oldWidget.isPremium != widget.isPremium) {
       _syncAnimationState();
     }
   }
@@ -79,10 +83,22 @@ class _NewsStoryCardState extends State<NewsStoryCard>
   }
 
   _BorderState get _currentBorderState {
+    // 1. If not saved, there is no special state.
     if (!widget.isSaved) return _BorderState.none;
-    if (widget.aiSummary != null && widget.aiSummary!.isNotEmpty)
+
+    // 2. If summary is already here, show the 'ready' state regardless of premium status.
+    if (widget.aiSummary != null && widget.aiSummary!.isNotEmpty) {
       return _BorderState.ready;
-    return _BorderState.pending;
+    }
+
+    // 3. If saved but no summary:
+    // Only show 'pending' (the animation) if the user is premium.
+    // Otherwise, treat it as 'none' so no animation plays for free users.
+    if (widget.isPremium) {
+      return _BorderState.pending;
+    } else {
+      return _BorderState.none;
+    }
   }
 
   @override
@@ -114,10 +130,20 @@ class _NewsStoryCardState extends State<NewsStoryCard>
           : "${DateFormat('MMM d').format(first)} - ${DateFormat('MMM d').format(last)}";
     }
 
-    return _buildWithBorder(context, uniqueSources, manualTypes, aiTypes, dateDisplay);
+    return _buildWithBorder(
+      context,
+      uniqueSources,
+      manualTypes,
+      aiTypes,
+      dateDisplay,
+    );
   }
 
-  Widget _buildImageHeader(NewsStory story, List<String> manualTypes, List<String> aiTypes) {
+  Widget _buildImageHeader(
+      NewsStory story,
+      List<String> manualTypes,
+      List<String> aiTypes,
+      ) {
     return SizedBox(
       width: double.infinity,
       height: story.imageUrl != null && story.imageUrl!.isNotEmpty ? 180 : 40,
@@ -131,14 +157,16 @@ class _NewsStoryCardState extends State<NewsStoryCard>
                 errorBuilder: (_, __, ___) => Container(color: Colors.white10),
               ),
             ),
-          // Subtle top-down gradient for tag readability
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.center,
-                  colors: [Colors.black.withValues(alpha: 0.6), Colors.transparent],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.6),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -165,7 +193,6 @@ class _NewsStoryCardState extends State<NewsStoryCard>
   Widget _buildFooter(List<String> uniqueSources, String dateDisplay) {
     return Row(
       children: [
-        // Sources Overlap
         SizedBox(
           height: 24,
           width: (uniqueSources.length * 14.0) + 10,
@@ -198,13 +225,11 @@ class _NewsStoryCardState extends State<NewsStoryCard>
             style: GoogleFonts.lexend(color: Colors.white38, fontSize: 11),
           ),
         ),
-        // THEMED BOOKMARK
         IconButton(
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           icon: Icon(
             widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
-            // Gold/Amber is gone. We use a bright Lavender for saved state.
             color: widget.isSaved ? const Color(0xFFA78BFA) : Colors.white30,
             size: 22,
           ),
@@ -222,7 +247,6 @@ class _NewsStoryCardState extends State<NewsStoryCard>
       String dateDisplay,
       ) {
     switch (_currentBorderState) {
-    // --- 1. Pending: Animated breathing glow while AI works ---
       case _BorderState.pending:
         return AnimatedBuilder(
           animation: _borderOpacityAnimation,
@@ -232,13 +256,16 @@ class _NewsStoryCardState extends State<NewsStoryCard>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  // Use the animated double for smooth opacity transitions
-                  color: Colors.purpleAccent.withValues(alpha: _borderOpacityAnimation.value),
+                  color: Colors.purpleAccent.withValues(
+                    alpha: _borderOpacityAnimation.value,
+                  ),
                   width: 1.5,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.purpleAccent.withValues(alpha: _borderOpacityAnimation.value * 0.3),
+                    color: Colors.purpleAccent.withValues(
+                      alpha: _borderOpacityAnimation.value * 0.3,
+                    ),
                     blurRadius: 12,
                     spreadRadius: 1,
                   ),
@@ -247,30 +274,43 @@ class _NewsStoryCardState extends State<NewsStoryCard>
               child: child,
             );
           },
-          child: _cardBody(context, uniqueSources, manualTypes, aiTypes, dateDisplay),
+          child: _cardBody(
+            context,
+            uniqueSources,
+            manualTypes,
+            aiTypes,
+            dateDisplay,
+          ),
         );
 
-    // --- 2. Ready & None: No outer borders (Clean Feed) ---
       case _BorderState.ready:
       case _BorderState.none:
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: _cardBody(context, uniqueSources, manualTypes, aiTypes, dateDisplay),
+          child: _cardBody(
+            context,
+            uniqueSources,
+            manualTypes,
+            aiTypes,
+            dateDisplay,
+          ),
         );
     }
   }
 
-  /// The Card itself — shared across all three border states.
-  /// No margin here; the parent (_buildWithBorder) handles spacing.
-  Widget _cardBody(BuildContext context, List<String> uniqueSources, List<String> manualTypes, List<String> aiTypes, String dateDisplay) {
+  Widget _cardBody(
+      BuildContext context,
+      List<String> uniqueSources,
+      List<String> manualTypes,
+      List<String> aiTypes,
+      String dateDisplay,
+      ) {
     final story = widget.story;
-    // Use a subtle glass look for the card itself to match your home screen
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          // Subtle border by default, only colors up when state is 'ready' or 'pending'
           color: Colors.white10,
           width: 1,
         ),
@@ -281,9 +321,7 @@ class _NewsStoryCardState extends State<NewsStoryCard>
           onTap: widget.onTap,
           child: Column(
             children: [
-              // IMAGE SECTION
               _buildImageHeader(story, manualTypes, aiTypes),
-
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -291,26 +329,25 @@ class _NewsStoryCardState extends State<NewsStoryCard>
                   children: [
                     Text(
                       story.canonicalTitle,
-                      style: GoogleFonts.lexend( // Use Lexend for consistency
+                      style: GoogleFonts.lexend(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
-
-                    // AI SUMMARY NOTIFICATION (Clean & Minimal)
                     if (_currentBorderState == _BorderState.ready)
                       _buildAISummaryBadge(),
-
                     if (story.summary != null) ...[
                       const SizedBox(height: 10),
                       Text(
                         story.summary!,
-                        maxLines: 2, // Reduced lines for scannability
-                        style: const TextStyle(color: Colors.white54, fontSize: 13),
+                        maxLines: 2,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
-
                     const SizedBox(height: 16),
                     _buildFooter(uniqueSources, dateDisplay),
                   ],
@@ -372,7 +409,8 @@ class _NewsStoryCardState extends State<NewsStoryCard>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isAi) const Icon(Icons.auto_awesome, size: 12, color: Colors.white),
+            if (isAi)
+              const Icon(Icons.auto_awesome, size: 12, color: Colors.white),
             if (isAi) const SizedBox(width: 4),
             Text(
               label.toUpperCase(),

@@ -1,14 +1,24 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   // final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   // Email & Password Sign Up
   Future<String?> signUpWithEmail(String email, String password) async {
     try {
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Create the user document immediately after sign-up.
+      // This runs once — the doc won't exist yet at this point.
+      await _createUserDocument(credential.user!.uid, email);
+
       return null; // Success
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
@@ -30,13 +40,24 @@ class AuthService {
     }
   }
 
+  /// Creates the initial user document in Firestore.
+  /// All new users start as non-premium, non-admin.
+  Future<void> _createUserDocument(String uid, String email) async {
+    await _firestore.collection('users').doc(uid).set({
+      'email': email,
+      'isPremium': false,
+      'isAdmin': false,
+      'stories': {},
+    });
+  }
+
   // Email & Password Login
   Future<String?> loginWithEmail(String email, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
       return null; // Success
     } on FirebaseAuthException catch (e) {
-      // Map Firebase codes to human-friendly Romanian or English messages
+      // Map Firebase codes to normal error messages
       switch (e.code) {
         case 'invalid-email':
           return 'The email address is badly formatted.';

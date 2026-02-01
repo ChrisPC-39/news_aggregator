@@ -14,6 +14,8 @@ class FloatingSearchAndFilter extends StatefulWidget {
   final Function(String) onSearchChanged;
   final VoidCallback onClearSearch;
   final FocusNode? searchFocusNode;
+  final bool showSavedOnly;
+  final Function(bool) onSavedOnlyToggled;
 
   const FloatingSearchAndFilter({
     super.key,
@@ -28,7 +30,7 @@ class FloatingSearchAndFilter extends StatefulWidget {
     required this.onClearSearch,
     required this.selectedSources,
     required this.onSourceToggled,
-    this.searchFocusNode,
+    this.searchFocusNode, required this.showSavedOnly, required this.onSavedOnlyToggled,
   });
 
   @override
@@ -73,6 +75,24 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Show Bookmarked Only',
+                                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    Switch(
+                                      value: widget.showSavedOnly,
+                                      activeColor: Colors.amber, // Matches the bookmark icon color
+                                      onChanged: (value) => widget.onSavedOnlyToggled(value),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(color: Colors.white10, height: 24),
                                 // Category label
                                 Text(
                                   'Categories',

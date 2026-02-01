@@ -126,41 +126,35 @@ class _NewsStoryCardState extends State<NewsStoryCard>
       List<String> aiTypes,
       String dateDisplay,
       ) {
-    final card = _cardBody(context, uniqueSources, manualTypes, aiTypes, dateDisplay);
-
-    // Pending: wrap in AnimatedBuilder so the border color updates each frame.
-    // All other states: static transparent border — same width, no layout shift.
-    if (_currentBorderState == _BorderState.pending) {
-      return AnimatedBuilder(
-        animation: _colorAnimation,
-        builder: (context, child) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _colorAnimation.value ?? Colors.purpleAccent,
-                width: 2.5,
+    switch (_currentBorderState) {
+    // --- Animated border while summary is generating ---
+      case _BorderState.pending:
+        return AnimatedBuilder(
+          animation: _colorAnimation,
+          builder: (context, child) {
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _colorAnimation.value ?? Colors.purpleAccent,
+                  width: 2.5,
+                ),
               ),
-            ),
-            child: child,
-          );
-        },
-        child: card,
-      );
-    }
+              child: child,
+            );
+          },
+          child: _cardBody(context, uniqueSources, manualTypes, aiTypes, dateDisplay),
+        );
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.transparent,
-          width: 2.5,
-        ),
-      ),
-      child: card,
-    );
+    // --- No border (unsaved, or summary already ready) ---
+      case _BorderState.ready:
+      case _BorderState.none:
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: _cardBody(context, uniqueSources, manualTypes, aiTypes, dateDisplay),
+        );
+    }
   }
 
   /// The Card itself — shared across all three border states.
@@ -311,7 +305,7 @@ class _NewsStoryCardState extends State<NewsStoryCard>
                         visualDensity: VisualDensity.compact,
                         icon: Icon(
                           widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
-                          color: widget.isSaved ? Colors.green[400] : Colors.white70,
+                          color: widget.isSaved ? Colors.amber : Colors.white70,
                           size: 20,
                         ),
                         onPressed: widget.onBookmarkToggle,

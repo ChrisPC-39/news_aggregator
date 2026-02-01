@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:ui';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For compute()
+import 'package:google_fonts/google_fonts.dart';
+import 'package:news_aggregator/widgets/CustomDrawer.dart';
 
 import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../models/article_model.dart';
+import '../services/auth_service.dart';
 import '../services/crawler_service.dart';
 import '../services/summary_service.dart';
 import '../services/firebase_save_service.dart';
@@ -36,6 +41,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
 
   Set<String> selectedCategories = {};
   int minimumSources = 2;
+  bool showSavedOnly = false;
   Set<String> selectedSources =
       Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
 
@@ -310,26 +316,39 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   // ---------------------------------------------------------------------------
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
-      final storySourceIds =
-          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
-      if (!storySourceIds.any((id) => selectedSources.contains(id)))
+      // 1. Saved filter (High priority/Early exit)
+      if (showSavedOnly && !_savedStories.containsKey(story.canonicalTitle)) {
         return false;
+      }
 
+      // 2. Source Filter
+      final storySourceIds =
+      story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+      final hasActiveSource = storySourceIds.any(
+            (id) => selectedSources.contains(id),
+      );
+      if (!hasActiveSource) return false;
+
+      // 3. Category Filter
       if (selectedCategories.isNotEmpty) {
         final allTypes = <String>{
           ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
           ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
         };
-        if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains))
+        // Check if the story contains ALL selected categories
+        if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains)) {
           return false;
+        }
       }
 
-      if (story.articles.map((a) => a.sourceName).toSet().length <
-          minimumSources)
-        return false;
+      // 4. Minimum Sources Filter
+      final uniqueSourcesCount =
+          story.articles.map((a) => a.sourceName).toSet().length;
+      if (uniqueSourcesCount < minimumSources) return false;
 
+      // 5. Search Filter
       if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.trimRight();
+        final q = _searchQuery.toLowerCase().trim();
         return story.canonicalTitle.toLowerCase().contains(q) ||
             (story.summary?.toLowerCase().contains(q) ?? false);
       }
@@ -378,6 +397,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                     : const SizedBox.shrink(),
           ),
         ),
+        drawer: CustomDrawer(),
         body: Stack(
           children: [
             _buildBody(filteredStories),
@@ -389,6 +409,12 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
               searchController: _searchController,
               searchQuery: _searchQuery,
               searchFocusNode: _searchFocusNode,
+              showSavedOnly: showSavedOnly,
+              onSavedOnlyToggled: (value) {
+                setState(() {
+                  showSavedOnly = value;
+                });
+              },
               onSourceToggled: (source, isSelected) {
                 setState(() {
                   final allSources =

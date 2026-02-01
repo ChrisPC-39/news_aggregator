@@ -100,7 +100,7 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
           IconButton(
             icon: Icon(
               _isSaved ? Icons.bookmark : Icons.bookmark_border,
-              color: _isSaved ? Colors.green[400] : Colors.white70,
+              color: _isSaved ? Colors.amber : Colors.white70,
             ),
             onPressed: () {
               widget.onBookmarkToggle();

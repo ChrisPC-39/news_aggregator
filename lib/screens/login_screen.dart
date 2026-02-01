@@ -23,13 +23,11 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleLogin() async {
-    // Simple local validation before even calling Firebase
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       _showErrorSnackBar("Please fill in all fields.");
       return;
     }
 
-    // Show a loading indicator (optional but recommended)
     final String? error = await AuthService().loginWithEmail(
       _emailController.text.trim(),
       _passwordController.text,
@@ -38,46 +36,37 @@ class _LoginPageState extends State<LoginPage> {
     if (error != null) {
       _showErrorSnackBar(error);
     } else {
-      Navigator.pushReplacementNamed(context, '/home');
+      if (mounted) Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
   void _handleSignUp() async {
-    // 1. Manual Validation: Check for empty fields
-    if (_emailController.text.isEmpty ||
-        _passwordController.text.isEmpty) {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       _showErrorSnackBar("Please fill in all fields.");
       return;
     }
 
-    // 2. Manual Validation: Check password length (Firebase requires 6+ characters)
     if (_passwordController.text.length < 6) {
       _showErrorSnackBar("Password must be at least 6 characters.");
       return;
     }
 
-    // 3. Call the AuthService and wait for the result
     final String? error = await AuthService().signUpWithEmail(
       _emailController.text.trim(),
       _passwordController.text,
     );
 
-    // 4. Handle the result
     if (error != null) {
       _showErrorSnackBar(error);
-    } else {
-      // Note: Firebase automatically logs the user in after a successful sign-up.
-      // If you are using an AuthGate, it will switch screens automatically.
-      // debugPrint("Sign up successful!");
     }
   }
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: TextStyle(color: Colors.white),),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating, // Makes it look modern
+        behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -88,35 +77,36 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Background Image with Dark Overlay
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: NetworkImage(
-                  'https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&q=80&w=2070',
-                ),
-                fit: BoxFit.cover,
-              ),
+          // 1. Background Image (Static)
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/background.png',
+              fit: BoxFit.cover,
             ),
-            child: Container(color: Colors.black.withValues(alpha: 0.75)),
           ),
 
-          // 2. The Glassmorphic Card
-          Center(
+          // 2. Scrollable Layer
+          Positioned.fill(
             child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
+              physics: const BouncingScrollPhysics(),
+              child: Container(
+                // Ensure the container is at least the height of the screen
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 60),
+                alignment: Alignment.center,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(30),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                     child: Container(
-                      padding: const EdgeInsets.fromLTRB(40, 40, 40, 10),
+                      padding: const EdgeInsets.fromLTRB(30, 40, 30, 20),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.1),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1.5,
                         ),
                       ),
@@ -158,57 +148,10 @@ class _LoginPageState extends State<LoginPage> {
                             icon: Icons.lock_outline,
                             controller: _passwordController,
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 30),
 
-                          // Login Button with Purple Gradient
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: double.infinity,
-                            height: 40, // Slightly taller for a better feel
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(15),
-                              gradient: LinearGradient(
-                                colors: _isLogin
-                                    ? [const Color(0xFF8B5CF6), const Color(0xFF6D28D9)] // Login Purple
-                                    : [const Color(0xFF6D28D9), const Color(0xFF4C1D95)], // Darker Sign-up Purple
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF8B5CF6).withOpacity(_isLogin ? 0.3 : 0.5),
-                                  blurRadius: _isLogin ? 12 : 20,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                              ),
-                              onPressed: _isLogin ? _handleLogin : _handleSignUp,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                transitionBuilder: (Widget child, Animation<double> animation) {
-                                  return FadeTransition(
-                                    opacity: animation,
-                                    child: ScaleTransition(scale: animation, child: child),
-                                  );
-                                },
-                                child: Text(
-                                  _isLogin ? "Login" : "Sign up",
-                                  key: ValueKey<bool>(_isLogin), // Crucial for AnimatedSwitcher to detect change
-                                  style: GoogleFonts.lexend(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                          // Action Button
+                          _buildSubmitButton(),
 
                           const SizedBox(height: 25),
                           const Text(
@@ -217,50 +160,17 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 25),
 
-                          // Google Login Button
+                          // Google Login
                           _buildSocialButton(
                             label: "Continue with Google",
-                            iconUrl:
-                                'https://freepnglogo.com/images/all_img/google-logo-2025-6ffb.png',
+                            iconUrl: 'https://freepnglogo.com/images/all_img/google-logo-2025-6ffb.png',
                             onTap: () {},
                           ),
-                          const SizedBox(height: 25),
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (Widget child, Animation<double> animation) {
-                              // This creates a fade + slight slide-up effect
-                              return FadeTransition(
-                                opacity: animation,
-                                child: SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0, 0.2), // Start slightly below
-                                    end: Offset.zero,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: Row(
-                              key: ValueKey<bool>(_isLogin), // Unique key to trigger animation
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  _isLogin ? "Don't have an account?" : "Already have an account?",
-                                  style: const TextStyle(color: Colors.white70),
-                                ),
-                                TextButton(
-                                  onPressed: () => _toggleMode(),
-                                  child: Text(
-                                    _isLogin ? "Sign up" : "Login",
-                                    style: const TextStyle(
-                                      color: Color(0xFFA78BFA), // Light purple to match theme
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Toggle Login/Signup
+                          _buildToggleArea(),
                         ],
                       ),
                     ),
@@ -274,16 +184,102 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  Widget _buildSubmitButton() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: double.infinity,
+      height: 50,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        gradient: LinearGradient(
+          colors: _isLogin
+              ? [const Color(0xFF8B5CF6), const Color(0xFF6D28D9)]
+              : [const Color(0xFF6D28D9), const Color(0xFF4C1D95)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withOpacity(_isLogin ? 0.3 : 0.5),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        ),
+        onPressed: _isLogin ? _handleLogin : _handleSignUp,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Text(
+            _isLogin ? "Login" : "Sign up",
+            key: ValueKey<bool>(_isLogin),
+            style: GoogleFonts.lexend(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleArea() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.2),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: Row(
+        key: ValueKey<bool>(_isLogin),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            _isLogin ? "Don't have an account?" : "Already have an account?",
+            style: const TextStyle(color: Colors.white70),
+          ),
+          TextButton(
+            onPressed: _toggleMode,
+            child: Text(
+              _isLogin ? "Sign up" : "Login",
+              style: const TextStyle(
+                color: Color(0xFFA78BFA),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGlassTextField({
     required String hint,
     required IconData icon,
-    required controller,
+    required TextEditingController controller,
     bool isPwd = false,
   }) {
     return TextField(
       controller: controller,
       obscureText: isPwd,
       style: const TextStyle(color: Colors.white),
+      keyboardType: !isPwd ? TextInputType.emailAddress : TextInputType.text,
+      textCapitalization: TextCapitalization.none,
+      autocorrect: false,
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: Colors.white70),
         hintText: hint,
@@ -310,17 +306,18 @@ class _LoginPageState extends State<LoginPage> {
   }) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.network(iconUrl, height: 24),
+            Image.network(iconUrl, height: 24, errorBuilder: (c, e, s) => const Icon(Icons.g_mobiledata, color: Colors.white)),
             const SizedBox(width: 12),
             Text(
               label,

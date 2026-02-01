@@ -33,9 +33,6 @@ class ArticleHive extends HiveObject {
   @HiveField(7)
   String sourceName;
 
-  @HiveField(8)
-  String? aiSummary;
-
   @HiveField(9)
   String? category;
 
@@ -48,7 +45,6 @@ class ArticleHive extends HiveObject {
     required this.publishedAt,
     this.content,
     required this.sourceName,
-    this.aiSummary,
     this.category,
   });
 
@@ -61,7 +57,6 @@ class ArticleHive extends HiveObject {
     publishedAt: a.publishedAt,
     content: a.content,
     sourceName: a.sourceName,
-    aiSummary: a.aiSummary,
     category: a.category,
   );
 
@@ -74,7 +69,6 @@ class ArticleHive extends HiveObject {
     publishedAt: publishedAt,
     content: content,
     sourceName: sourceName,
-    aiSummary: aiSummary,
     category: category,
   );
 }

@@ -7,7 +7,6 @@ class Article {
   final DateTime publishedAt;
   final String? content;
   final String sourceName;
-  final String? aiSummary;
   final String? category;
 
   Set<String>? _normalizedTokens;
@@ -21,7 +20,6 @@ class Article {
     required this.publishedAt,
     this.content,
     required this.sourceName,
-    this.aiSummary,
     this.category,
   });
 
@@ -35,7 +33,6 @@ class Article {
       'urlToImage': urlToImage,
       'publishedAt': publishedAt.toIso8601String(),
       'sourceName': sourceName,
-      'aiSummary': aiSummary,
       'category': category,
     };
   }
@@ -50,7 +47,6 @@ class Article {
       urlToImage: json['urlToImage'] as String?,
       publishedAt: DateTime.parse(json['publishedAt'] as String),
       sourceName: json['sourceName'] as String,
-      aiSummary: json['aiSummary'] as String?,
       category: json['category'] as String?,
     );
   }

@@ -1,9 +1,11 @@
 import 'dart:async';
-
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/article_model.dart';
 import '../models/news_story_model.dart';
 import '../services/firebase_save_service.dart';
 
@@ -43,42 +45,21 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
 
     _shimmerController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(seconds: 2),
     );
 
-    _shimmerAnimation = Tween<double>(begin: -1.0, end: 2.0).animate(
+    _shimmerAnimation = Tween<double>(begin: 0.1, end: 0.8).animate(
       CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
     );
 
     _startAppropriateAnimation();
   }
 
-  @override
-  void didUpdateWidget(covariant GroupedNewsScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Parent re-pushed or updated props (e.g. after bookmark toggle)
-    if (oldWidget.isSaved != widget.isSaved) {
-      setState(() => _isSaved = widget.isSaved);
-    }
-
-    // The aiSummary arrived from the parent while this screen is open
-    if (oldWidget.aiSummary != widget.aiSummary) {
-      setState(() {
-        _aiSummary = widget.aiSummary;
-        _startAppropriateAnimation();
-      });
-    }
-  }
-
-  /// If summary is pending → repeat (loading pulse).
-  /// If summary exists   → forward once (single shimmer sweep, then stop).
   void _startAppropriateAnimation() {
-    _shimmerController.stop();
     if (_isSaved && _aiSummary == null) {
-      _shimmerController.repeat();
+      _shimmerController.repeat(reverse: true);
     } else {
-      _shimmerController.forward(from: 0.0);
+      _shimmerController.stop();
     }
   }
 
@@ -94,274 +75,288 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
     final articles = widget.story.articles;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Coverage'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.black.withValues(alpha: 0.2)),
+          ),
+        ),
+        title: Text('Coverage', style: GoogleFonts.lexend(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: Icon(
               _isSaved ? Icons.bookmark : Icons.bookmark_border,
-              color: _isSaved ? Colors.amber : Colors.white70,
+              color: _isSaved ? const Color(0xFFA78BFA) : Colors.white70,
             ),
-            onPressed: () {
-              widget.onBookmarkToggle();
-              setState(() {
-                _isSaved = !_isSaved;
-
-                if (!_isSaved) {
-                  // Un-bookmarked — tear everything down.
-                  _aiSummary = null;
-                  _summaryListener?.cancel();
-                  _summaryListener = null;
-                  _shimmerController.stop();
-                } else {
-                  // Just bookmarked — summary is pending, start pulsing.
-                  _startAppropriateAnimation();
-
-                  // Open a one-shot listener so this screen picks up the
-                  // summary directly from Firestore when it lands.
-                  _summaryListener =
-                      _firebaseSaveService
-                          .watchStory(widget.story.canonicalTitle)
-                          .listen((data) {
-                        final summary = data?['aiSummary'] as String?;
-                        if (summary != null && summary.isNotEmpty) {
-                          if (mounted) {
-                            setState(() {
-                              _aiSummary = summary;
-                              _startAppropriateAnimation();
-                            });
-                          }
-                          // Summary arrived — cancel and clean up.
-                          _summaryListener?.cancel();
-                          _summaryListener = null;
-                        }
-                      });
-                }
-              });
-            },
+            onPressed: _handleBookmarkToggle,
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Stack(
         children: [
-          // --- Hero image ---
-          if (widget.story.imageUrl != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                widget.story.imageUrl!,
-                height: 220,
-                width: double.infinity,
-                fit: BoxFit.cover,
+          // Background Romania Image (consistent with home screen)
+          Positioned.fill(
+            child: Image.network(
+              'https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&q=80&w=2070',
+              fit: BoxFit.cover,
+            ),
+          ),
+
+
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Adjust blur
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.65), // Adjust darkness
               ),
             ),
-          const SizedBox(height: 16),
-
-          // --- Title ---
-          Text(
-            widget.story.canonicalTitle,
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
 
-          // --- Original summary ---
-          if (widget.story.summary != null) ...[
-            Text(
-              widget.story.summary!,
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 24),
-          ],
+          // Content
+          ListView(
+            padding: const EdgeInsets.fromLTRB(16, 120, 16, 40),
+            children: [
+              // --- Hero image ---
+              if (widget.story.imageUrl != null)
+                _buildHeroImage(),
 
-          // --- AI Summary card ---
-          // Only show if the story is bookmarked.
-          if (_isSaved) ...[
-            // Summary is pending — show a pulsing skeleton placeholder.
-            // Summary has arrived — show the real text.
-            // _buildAiSummaryCard handles both via the nullable summary param.
-            _buildAiSummaryCard(context, _aiSummary),
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 24),
 
-          // --- Sources header ---
-          const Text(
-            'Detailed Sources',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const Divider(),
-
-          // --- Article list ---
-          ...articles.map((article) {
-            return ListTile(
-              contentPadding:
-              const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              title: Padding(
-                padding: const EdgeInsets.only(bottom: 4.0),
-                child: Text(
-                  article.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 15,
-                  ),
+              // --- Title ---
+              Text(
+                widget.story.canonicalTitle,
+                style: GoogleFonts.lexend(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-              subtitle: Row(
+              const SizedBox(height: 12),
+
+              // --- Original summary ---
+              if (widget.story.summary != null)
+                Text(
+                  widget.story.summary!,
+                  style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.5),
+                ),
+
+              const SizedBox(height: 32),
+
+              // --- AI Summary card ---
+              if (_isSaved) ...[
+                _buildAiSummaryCard(context, _aiSummary),
+                const SizedBox(height: 32),
+              ],
+
+              // --- Sources header ---
+              Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.asset(
-                      'assets/images/${article.sourceName.toLowerCase()}.png',
-                      width: 16,
-                      height: 16,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.public,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
+                  const Icon(Icons.article_outlined, color: Colors.white54, size: 20),
+                  const SizedBox(width: 8),
                   Text(
-                    article.sourceName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[400],
+                    'DETAILED SOURCES',
+                    style: GoogleFonts.lexend(
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white54,
+                      letterSpacing: 1.2,
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                    child: Text("•", style: TextStyle(color: Colors.grey[600])),
-                  ),
-                  Text(
-                    timeago.format(article.publishedAt),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
-              trailing: Icon(
-                Icons.open_in_new,
-                size: 14,
-                color: Colors.grey[700],
-              ),
-              onTap: () async {
-                final uri = Uri.parse(article.url);
-                if (!await launchUrl(uri)) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Could not open the link')),
-                    );
-                  }
-                }
-              },
-            );
-          }),
+              const Divider(color: Colors.white10, height: 32),
+
+              // --- Article list ---
+              ...articles.map((article) => _buildSourceTile(context, article)),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  /// Builds the AI summary card with an animated shimmer border and a
-  /// dark gradient background to visually distinguish it from regular content.
-  /// If [summary] is null, a skeleton placeholder is shown instead.
-  Widget _buildAiSummaryCard(BuildContext context, String? summary) {
-    return AnimatedBuilder(
-      animation: _shimmerAnimation,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: _AiCardBorderPainter(progress: _shimmerAnimation.value),
-          child: child,
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1A1025),
-              Color(0xFF12101F),
-              Color(0xFF1A1530),
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Label row: icon + "AI Summary" / "Generating..."
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.deepPurple.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      size: 16,
-                      color: Colors.purpleAccent,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    summary != null ? 'AI Summary' : 'Generating summary...',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: summary != null
-                          ? Colors.purpleAccent
-                          : Colors.purpleAccent.withValues(alpha: 0.6),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Thin separator that fades out to the right
-              Container(
-                height: 1,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0x60A020FF),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Either the real summary or a skeleton
-              if (summary != null)
-                Text(
-                  summary,
-                  style: const TextStyle(
-                    color: Color(0xDDDDDDDD),
-                    fontSize: 14,
-                    height: 1.6,
-                  ),
-                )
-              else
-                _buildSkeleton(),
-            ],
-          ),
+  Widget _buildHeroImage() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20)],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          widget.story.imageUrl!,
+          height: 240,
+          width: double.infinity,
+          fit: BoxFit.cover,
         ),
       ),
     );
   }
 
-  /// Three grey rounded bars that mimic lines of text while the summary
-  /// is still generating. Widths are staggered so it looks natural.
+  void _handleBookmarkToggle() {
+    widget.onBookmarkToggle();
+    setState(() {
+      _isSaved = !_isSaved;
+      if (!_isSaved) {
+        _aiSummary = null;
+        _summaryListener?.cancel();
+        _summaryListener = null;
+        _shimmerController.stop();
+      } else {
+        _startAppropriateAnimation();
+        _summaryListener = _firebaseSaveService
+            .watchStory(widget.story.canonicalTitle)
+            .listen((data) {
+          final summary = data?['aiSummary'] as String?;
+          if (summary != null && summary.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                _aiSummary = summary;
+                _startAppropriateAnimation();
+              });
+            }
+            _summaryListener?.cancel();
+            _summaryListener = null;
+          }
+        });
+      }
+    });
+  }
+
+  Widget _buildAiSummaryCard(BuildContext context, String? summary) {
+    return AnimatedBuilder(
+      animation: _shimmerAnimation,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: summary == null
+                  ? Colors.purpleAccent.withValues(alpha: _shimmerAnimation.value)
+                  : Colors.white.withValues(alpha: 0.1),
+              width: 1.5,
+            ),
+            color: Colors.white.withValues(alpha: 0.05),
+          ),
+          child: child,
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, size: 18, color: Color(0xFFA78BFA)),
+                const SizedBox(width: 10),
+                Text(
+                  summary != null ? 'AI INSIGHT' : 'GENERATING SUMMARY...',
+                  style: GoogleFonts.lexend(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFA78BFA),
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (summary != null)
+              Text(
+                summary,
+                style: GoogleFonts.lexend(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 15,
+                  height: 1.6,
+                ),
+              )
+            else
+              _buildSkeleton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSourceTile(BuildContext context, Article article) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      // Material is required for the InkWell splash to actually render
+      child: Material(
+        color: Colors.transparent,
+        clipBehavior: Clip.antiAlias, // Important: clips the splash to the border radius
+        borderRadius: BorderRadius.circular(16),
+        child: ListTile(
+          // Customizing the splash color to match your purple theme
+          hoverColor: Colors.white.withValues(alpha: 0.05),
+          splashColor: const Color(0xFFA78BFA).withValues(alpha: 0.1),
+          focusColor: const Color(0xFFA78BFA).withValues(alpha: 0.05),
+
+          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          title: Text(
+            article.title,
+            style: GoogleFonts.lexend(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 10,
+                  backgroundColor: Colors.white10,
+                  backgroundImage: AssetImage(
+                      'assets/images/${article.sourceName.toLowerCase().replaceAll('.ro', '').replaceAll('.net', '')}.png'
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  article.sourceName,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.white38,
+                      fontWeight: FontWeight.bold
+                  ),
+                ),
+                const Text("  •  ", style: TextStyle(color: Colors.white24)),
+                Text(
+                  timeago.format(article.publishedAt),
+                  style: const TextStyle(fontSize: 11, color: Colors.white38),
+                ),
+              ],
+            ),
+          ),
+          trailing: const Icon(Icons.open_in_new, size: 14, color: Colors.white24),
+          onTap: () async {
+            final uri = Uri.parse(article.url);
+            if (!await launchUrl(uri)) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open link'))
+                );
+              }
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildSkeleton() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -370,84 +365,20 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
         const SizedBox(height: 10),
         _skeletonLine(double.infinity),
         const SizedBox(height: 10),
-        _skeletonLine(0.6), // last line shorter — like a real paragraph end
+        _skeletonLine(0.6),
       ],
     );
   }
 
-  /// A single skeleton line. [widthFraction] is relative to the parent width;
-  /// use [double.infinity] to fill the full width.
   Widget _skeletonLine(double widthFraction) {
     return Container(
       height: 14,
       width: widthFraction == double.infinity ? double.infinity : null,
-      constraints: widthFraction != double.infinity
-          ? BoxConstraints(maxWidth: 240 * widthFraction)
-          : null,
+      constraints: widthFraction != double.infinity ? BoxConstraints(maxWidth: 240 * widthFraction) : null,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(4),
       ),
     );
-  }
-}
-
-/// Paints the animated shimmer border around the AI summary card.
-/// A bright highlight travels around the rounded-rect perimeter continuously.
-class _AiCardBorderPainter extends CustomPainter {
-  final double progress; // 0.0 → 1.0, driven by the AnimationController
-
-  _AiCardBorderPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(14));
-
-    // 1. Static base border — subtle dark purple so the card has definition
-    //    even when the shimmer highlight is on the opposite side.
-    final basePaint = Paint()
-      ..color = const Color(0x40A020FF) // purpleAccent @ 25%
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawRRect(rrect, basePaint);
-
-    // 2. Animated shimmer: clip to the border path, then draw a large
-    //    gradient that moves based on `progress`.
-    canvas.save();
-    canvas.clipRRect(rrect.inflate(1)); // slight inflate so stroke fits inside clip
-    canvas.clipRRect(rrect.deflate(0.5), doAntiAlias: false); // hollow out the inside
-
-    // The gradient moves horizontally; progress shifts it from off-left to off-right.
-    final gradientRect = Rect.fromLTWH(
-      (progress - 0.5) * size.width * 2 - size.width * 0.3,
-      0,
-      size.width * 0.6,
-      size.height,
-    );
-
-    final shimmerPaint = Paint()
-      ..shader = LinearGradient(
-        colors: const [
-          Colors.transparent,
-          Color(0x00A020FF),
-          Color(0xFFD0A0FF), // bright highlight peak
-          Color(0xFFA020FF), // purpleAccent
-          Color(0x00A020FF),
-          Colors.transparent,
-        ],
-      ).createShader(gradientRect);
-
-    canvas.drawRect(
-      Rect.fromLTWH(-2, -2, size.width + 4, size.height + 4),
-      shimmerPaint,
-    );
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _AiCardBorderPainter oldDelegate) {
-    return oldDelegate.progress != progress;
   }
 }

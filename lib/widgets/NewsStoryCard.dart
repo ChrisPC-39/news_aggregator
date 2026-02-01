@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -42,19 +43,18 @@ class NewsStoryCard extends StatefulWidget {
 class _NewsStoryCardState extends State<NewsStoryCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<Color?> _colorAnimation;
+  late Animation<double> _borderOpacityAnimation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(seconds: 2),
     );
-    _colorAnimation = ColorTween(
-      begin: Colors.purpleAccent.withValues(alpha: 0.2),
-      end: Colors.purpleAccent,
-    ).animate(_controller);
+    _borderOpacityAnimation = Tween<double>(begin: 0.1, end: 0.8).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
 
     _syncAnimationState();
   }
@@ -71,12 +71,10 @@ class _NewsStoryCardState extends State<NewsStoryCard>
 
   /// Start or stop the animation based on current border state.
   void _syncAnimationState() {
-    switch (_currentBorderState) {
-      case _BorderState.pending:
-        _controller.repeat(reverse: true);
-      case _BorderState.none:
-      case _BorderState.ready:
-        _controller.stop();
+    if (_currentBorderState == _BorderState.pending) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
     }
   }
 
@@ -119,6 +117,103 @@ class _NewsStoryCardState extends State<NewsStoryCard>
     return _buildWithBorder(context, uniqueSources, manualTypes, aiTypes, dateDisplay);
   }
 
+  Widget _buildImageHeader(NewsStory story, List<String> manualTypes, List<String> aiTypes) {
+    return SizedBox(
+      width: double.infinity,
+      height: story.imageUrl != null && story.imageUrl!.isNotEmpty ? 180 : 40,
+      child: Stack(
+        children: [
+          if (story.imageUrl != null && story.imageUrl!.isNotEmpty)
+            Positioned.fill(
+              child: Image.network(
+                story.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(color: Colors.white10),
+              ),
+            ),
+          // Subtle top-down gradient for tag readability
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.center,
+                  colors: [Colors.black.withValues(alpha: 0.6), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+          if (manualTypes.isNotEmpty || aiTypes.isNotEmpty)
+            Positioned(
+              top: 10,
+              left: 10,
+              right: 10,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ...manualTypes.map((t) => _buildTagChip(t, isAi: false)),
+                  ...aiTypes.map((t) => _buildTagChip(t, isAi: true)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter(List<String> uniqueSources, String dateDisplay) {
+    return Row(
+      children: [
+        // Sources Overlap
+        SizedBox(
+          height: 24,
+          width: (uniqueSources.length * 14.0) + 10,
+          child: Stack(
+            children: List.generate(uniqueSources.length, (index) {
+              return Positioned(
+                left: index * 14.0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.black, width: 2),
+                  ),
+                  child: CircleAvatar(
+                    radius: 10,
+                    backgroundColor: Colors.white10,
+                    backgroundImage: AssetImage(
+                      'assets/images/${uniqueSources[index].toLowerCase().replaceAll('.ro', '').replaceAll('.net', '')}.png',
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            "${uniqueSources.join(', ')} • $dateDisplay",
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.lexend(color: Colors.white38, fontSize: 11),
+          ),
+        ),
+        // THEMED BOOKMARK
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          icon: Icon(
+            widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
+            // Gold/Amber is gone. We use a bright Lavender for saved state.
+            color: widget.isSaved ? const Color(0xFFA78BFA) : Colors.white30,
+            size: 22,
+          ),
+          onPressed: widget.onBookmarkToggle,
+        ),
+      ],
+    );
+  }
+
   Widget _buildWithBorder(
       BuildContext context,
       List<String> uniqueSources,
@@ -127,19 +222,27 @@ class _NewsStoryCardState extends State<NewsStoryCard>
       String dateDisplay,
       ) {
     switch (_currentBorderState) {
-    // --- Animated border while summary is generating ---
+    // --- 1. Pending: Animated breathing glow while AI works ---
       case _BorderState.pending:
         return AnimatedBuilder(
-          animation: _colorAnimation,
+          animation: _borderOpacityAnimation,
           builder: (context, child) {
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _colorAnimation.value ?? Colors.purpleAccent,
-                  width: 2.5,
+                  // Use the animated double for smooth opacity transitions
+                  color: Colors.purpleAccent.withValues(alpha: _borderOpacityAnimation.value),
+                  width: 1.5,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purpleAccent.withValues(alpha: _borderOpacityAnimation.value * 0.3),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
               child: child,
             );
@@ -147,7 +250,7 @@ class _NewsStoryCardState extends State<NewsStoryCard>
           child: _cardBody(context, uniqueSources, manualTypes, aiTypes, dateDisplay),
         );
 
-    // --- No border (unsaved, or summary already ready) ---
+    // --- 2. Ready & None: No outer borders (Clean Feed) ---
       case _BorderState.ready:
       case _BorderState.none:
         return Padding(
@@ -159,164 +262,83 @@ class _NewsStoryCardState extends State<NewsStoryCard>
 
   /// The Card itself — shared across all three border states.
   /// No margin here; the parent (_buildWithBorder) handles spacing.
-  Widget _cardBody(
-      BuildContext context,
-      List<String> uniqueSources,
-      List<String> manualTypes,
-      List<String> aiTypes,
-      String dateDisplay,
-      ) {
+  Widget _cardBody(BuildContext context, List<String> uniqueSources, List<String> manualTypes, List<String> aiTypes, String dateDisplay) {
     final story = widget.story;
-    final articles = story.articles;
+    // Use a subtle glass look for the card itself to match your home screen
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          // Subtle border by default, only colors up when state is 'ready' or 'pending'
+          color: Colors.white10,
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: widget.onTap,
+          child: Column(
+            children: [
+              // IMAGE SECTION
+              _buildImageHeader(story, manualTypes, aiTypes),
 
-    return Card(
-      margin: EdgeInsets.zero, // margin is on the outer Container
-      elevation: 4,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: widget.onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- Image + Tags ---
-            SizedBox(
-              width: double.infinity,
-              height:
-              story.imageUrl != null && story.imageUrl!.isNotEmpty ? 200 : 35,
-              child: Stack(
-                children: [
-                  if (story.imageUrl != null && story.imageUrl!.isNotEmpty)
-                    Image.network(
-                      story.imageUrl!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const SizedBox(),
-                    ),
-                  if (manualTypes.isNotEmpty || aiTypes.isNotEmpty)
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      right: 12,
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          ...manualTypes.map((t) => _buildTagChip(t, isAi: false)),
-                          ...aiTypes.map((t) => _buildTagChip(t, isAi: true)),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            // --- Content ---
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    story.canonicalTitle,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  // AI summary badge — only shown when ready
-                  if (_currentBorderState == _BorderState.ready)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.auto_awesome, size: 13, color: Colors.purpleAccent),
-                            SizedBox(width: 6),
-                            Text(
-                              'AI Summary available',
-                              style: TextStyle(
-                                color: Colors.purpleAccent,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // Original summary
-                  if (story.summary != null) ...[
-                    const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      story.summary!,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white60),
+                      story.canonicalTitle,
+                      style: GoogleFonts.lexend( // Use Lexend for consistency
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
                     ),
-                  ],
 
-                  const SizedBox(height: 16),
+                    // AI SUMMARY NOTIFICATION (Clean & Minimal)
+                    if (_currentBorderState == _BorderState.ready)
+                      _buildAISummaryBadge(),
 
-                  // --- Footer: sources + date + bookmark ---
-                  Row(
-                    children: [
-                      SizedBox(
-                        height: 24,
-                        width: (uniqueSources.length * 14.0) + 10,
-                        child: Stack(
-                          children: List.generate(uniqueSources.length, (index) {
-                            return Positioned(
-                              left: index * 14.0,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.black, width: 2),
-                                ),
-                                child: CircleAvatar(
-                                  radius: 10,
-                                  backgroundColor: Colors.grey[900],
-                                  backgroundImage: AssetImage(
-                                    'assets/images/${uniqueSources[index].toLowerCase().replaceAll('.ro', '').replaceAll('.net', '')}.png',
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          "${uniqueSources.join(', ')} • $dateDisplay",
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white38, fontSize: 11),
-                        ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        icon: Icon(
-                          widget.isSaved ? Icons.bookmark : Icons.bookmark_border,
-                          color: widget.isSaved ? Colors.amber : Colors.white70,
-                          size: 20,
-                        ),
-                        onPressed: widget.onBookmarkToggle,
+                    if (story.summary != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        story.summary!,
+                        maxLines: 2, // Reduced lines for scannability
+                        style: const TextStyle(color: Colors.white54, fontSize: 13),
                       ),
                     ],
-                  ),
-                ],
+
+                    const SizedBox(height: 16),
+                    _buildFooter(uniqueSources, dateDisplay),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAISummaryBadge() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, size: 12, color: Color(0xFFA78BFA)),
+          const SizedBox(width: 4),
+          Text(
+            'AI Summary Ready',
+            style: GoogleFonts.lexend(
+              color: const Color(0xFFA78BFA),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }

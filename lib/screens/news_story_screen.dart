@@ -352,9 +352,14 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
 
       // 5. Search Filter
       if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase().trim();
-        return story.canonicalTitle.toLowerCase().contains(q) ||
-            (story.summary?.toLowerCase().contains(q) ?? false);
+        final q = Globals.normalizeDiacritics(_searchQuery).trim();
+        final normalizedTitle = Globals.normalizeDiacritics(
+          story.canonicalTitle,
+        );
+        final normalizedSummary = Globals.normalizeDiacritics(
+          story.summary ?? '',
+        );
+        return normalizedTitle.contains(q) || (normalizedSummary.contains(q));
       }
 
       return true;
@@ -442,7 +447,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
               },
               onSearchChanged: (value) {
                 setState(() {
-                  _searchQuery = value.toLowerCase();
+                  _searchQuery = Globals.normalizeDiacritics(value);
                   _showSearchBar = true;
                 });
               },

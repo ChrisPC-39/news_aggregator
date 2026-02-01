@@ -1,16 +1,13 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For compute()
-import 'package:google_fonts/google_fonts.dart';
 import 'package:news_aggregator/widgets/CustomDrawer.dart';
 
 import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../models/article_model.dart';
-import '../services/auth_service.dart';
 import '../services/crawler_service.dart';
 import '../services/summary_service.dart';
 import '../services/firebase_save_service.dart';
@@ -20,7 +17,14 @@ import '../widgets/NewsStoryCard.dart';
 import 'grouped_news_screen.dart';
 
 class NewsStoryScreen extends StatefulWidget {
-  const NewsStoryScreen({super.key});
+  final bool isPremium;
+  final bool isAdmin;
+
+  const NewsStoryScreen({
+    super.key,
+    required this.isPremium,
+    required this.isAdmin,
+  });
 
   @override
   State<NewsStoryScreen> createState() => _NewsStoryScreenState();
@@ -137,9 +141,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
           }
         }
 
-        // If the summary is still pending, open a one-shot listener so the
-        // card updates when it arrives.
-        if (_savedStories[title] == null) {
+        // If the summary is still pending and the user is premium,
+        // open a one-shot listener so the card updates when it arrives.
+        if (_savedStories[title] == null && widget.isPremium) {
           _listenForSummary(title);
         }
       }
@@ -194,9 +198,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     }
 
     // Only reached if the Firestore write succeeded.
-    // These are both fire-and-forget — failures here are logged internally
-    // and should never surface as "Failed to update".
-    if (!isCurrentlySaved) {
+    // Summary generation is premium-only — non-premium users still get the
+    // bookmark, but the AI summary card won't appear.
+    if (!isCurrentlySaved && widget.isPremium) {
       _generateAndUploadSummary(story);
       _listenForSummary(title);
     }
@@ -323,9 +327,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
 
       // 2. Source Filter
       final storySourceIds =
-      story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
+          story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
       final hasActiveSource = storySourceIds.any(
-            (id) => selectedSources.contains(id),
+        (id) => selectedSources.contains(id),
       );
       if (!hasActiveSource) return false;
 
@@ -481,18 +485,18 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                   children: [
                     const Text('No news found.'),
                     TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          _searchQuery = '';
-                          selectedCategories.clear();
-                          minimumSources = 1;
-                          selectedSources =
-                              Globals.sourceConfigs.keys
-                                  .map((source) => source.toLowerCase())
-                                  .toSet();
-                        });
-                      },
+                      onPressed:
+                          () => setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                            selectedCategories.clear();
+                            minimumSources = 1;
+                            showSavedOnly = false;
+                            selectedSources =
+                                Globals.sourceConfigs.keys
+                                    .map((source) => source.toLowerCase())
+                                    .toSet();
+                          }),
                       child: const Text('Clear filters'),
                     ),
                   ],
@@ -516,6 +520,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
             isSaved: isSaved,
             // null if not saved, or if saved but summary hasn't arrived
             aiSummary: _savedStories[title],
+            isPremium: widget.isPremium,
             onBookmarkToggle: () => toggleBookmark(story),
             onTap:
                 () => Navigator.push(
@@ -525,8 +530,8 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                         (_) => GroupedNewsScreen(
                           story: story,
                           isSaved: isSaved,
-                          aiSummary:
-                              _savedStories[title] ?? "Loading",
+                          aiSummary: _savedStories[title],
+                          isPremium: widget.isPremium,
                           onBookmarkToggle: () => toggleBookmark(story),
                         ),
                   ),

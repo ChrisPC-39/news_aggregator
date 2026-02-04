@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../screens/changelog_screen.dart';
 import '../services/auth_service.dart'; // Ensure this path is correct
 
 class CustomDrawer extends StatelessWidget {
@@ -28,7 +29,10 @@ class CustomDrawer extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.4),
                   border: Border(
-                    right: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1),
+                    right: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      width: 1,
+                    ),
                   ),
                 ),
               ),
@@ -42,11 +46,11 @@ class CustomDrawer extends StatelessWidget {
               children: [
                 _buildUserHeader(user),
                 const SizedBox(height: 20),
+
                 // const Padding(
                 //   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 //   child: Divider(color: Colors.white10),
                 // ),
-
                 _buildDrawerItem(
                   icon: Icons.settings_outlined,
                   title: 'Settings',
@@ -56,7 +60,13 @@ class CustomDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   icon: Icons.info_outline,
                   title: 'App Info',
-                  onTap: () => Navigator.pop(context),
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChangelogPage(),
+                        ),
+                      ),
                 ),
 
                 const Spacer(), // Pushes logout to the bottom
@@ -98,7 +108,11 @@ class CustomDrawer extends StatelessWidget {
               backgroundColor: Colors.white.withValues(alpha: 0.1),
               child: Text(
                 user?.email?[0].toUpperCase() ?? "U",
-                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -113,7 +127,11 @@ class CustomDrawer extends StatelessWidget {
           ),
           Text(
             isPremium ? "Premium Account" : "Member",
-            style: TextStyle(color: Color(0xFFA78BFA), fontSize: 12, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              color: Color(0xFFA78BFA),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -135,12 +153,18 @@ class CustomDrawer extends StatelessWidget {
         splashColor: Colors.white.withValues(alpha: 0.05),
         leading: Icon(
           icon,
-          color: isError ? Colors.redAccent.withValues(alpha: 0.8) : Colors.white70,
+          color:
+              isError
+                  ? Colors.redAccent.withValues(alpha: 0.8)
+                  : Colors.white70,
         ),
         title: Text(
           title,
           style: GoogleFonts.lexend(
-            color: isError ? Colors.redAccent.withValues(alpha: 0.8) : Colors.white,
+            color:
+                isError
+                    ? Colors.redAccent.withValues(alpha: 0.8)
+                    : Colors.white,
             fontSize: 15,
             fontWeight: FontWeight.w400,
           ),

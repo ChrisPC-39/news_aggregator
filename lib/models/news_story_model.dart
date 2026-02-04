@@ -7,6 +7,7 @@ class NewsStory {
   List<String>? storyTypes;
   String? imageUrl;
   List<String>? inferredStoryTypes;
+  bool isSaved;
 
   NewsStory({
     required this.canonicalTitle,
@@ -15,6 +16,7 @@ class NewsStory {
     this.storyTypes,
     this.imageUrl,
     this.inferredStoryTypes,
+    this.isSaved = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -25,6 +27,7 @@ class NewsStory {
       'storyTypes': storyTypes,
       'inferredStoryTypes': inferredStoryTypes,
       'imageUrl': imageUrl,
+      'isSaved': isSaved,
     };
   }
 
@@ -38,6 +41,7 @@ class NewsStory {
       storyTypes: (json['storyTypes'] as List?)?.cast<String>(),
       inferredStoryTypes: (json['inferredStoryTypes'] as List?)?.cast<String>(),
       imageUrl: json['imageUrl'] as String?,
+      isSaved: json['isSaved'] as bool? ?? true,
     );
   }
 }

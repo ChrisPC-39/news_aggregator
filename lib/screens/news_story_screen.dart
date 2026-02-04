@@ -9,6 +9,7 @@ import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../models/article_model.dart';
 import '../services/crawler_service.dart';
+import '../services/grouped_stories_cache_service.dart';
 import '../services/summary_service.dart';
 import '../services/firebase_save_service.dart';
 import '../services/v3_score_service.dart';
@@ -53,6 +54,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   // News data
   // ---------------------------------------------------------------------------
   final CrawlerService _crawlerService = CrawlerService();
+  final GroupedStoriesCacheService _cacheService = GroupedStoriesCacheService();
   List<NewsStory> _stories = [];
   bool _isLoading = true;
 
@@ -83,6 +85,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     super.initState();
     _scrollController.addListener(_onScroll);
     _stories = _crawlerService.cache.load();
+    _loadSavedStoriesFromCache();
 
     _crawlerService.isProcessing.listen((isProcessing) {
       if (mounted) setState(() => _isLoading = isProcessing);
@@ -91,7 +94,10 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     // _fetchSavedStories must run after _refreshNews so it compares against
     // the final crawled list — otherwise _refreshNews overwrites _stories
     // and wipes out any Firebase stories that were appended.
-    _refreshNews().then((_) => _fetchSavedStories());
+    // _refreshNews().then((_) => _fetchSavedStories());
+    // ✅ Refresh news and sync Firebase bookmarks in parallel
+    _refreshNews();
+    _syncFirebaseBookmarks();
   }
 
   @override
@@ -106,53 +112,68 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     super.dispose();
   }
 
+  void _loadSavedStoriesFromCache() {
+    final savedStories = _crawlerService.cache.loadSaved();
+    setState(() {
+      _savedStories.clear();
+      for (var story in savedStories) {
+        _savedStories[story.canonicalTitle] = story.summary;
+        // Listen for summary updates if premium
+        if (widget.isPremium && (story.summary == null || story.summary!.isEmpty)) {
+          _listenForSummary(story.canonicalTitle);
+        }
+      }
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Firebase: initial load of saved stories
   // ---------------------------------------------------------------------------
 
-  /// Loads saved bookmark state from Firebase, and hydrates any stories
-  /// that exist in Firebase but are missing from the local crawled list.
-  Future<void> _fetchSavedStories() async {
-    final snapshot = await _firebaseSaveService.fetchRawStoriesMap();
-    if (!mounted) return;
+  /// Sync bookmarks from Firebase without blocking UI
+  Future<void> _syncFirebaseBookmarks() async {
+    try {
+      final localSaved = _crawlerService.cache.loadSaved();
 
-    final localTitles = _stories.map((s) => s.canonicalTitle).toSet();
-    final missingStories = <NewsStory>[];
+      for (final story in localSaved) {
+        final title = story.canonicalTitle;
 
-    setState(() {
-      _savedStories.clear();
+        // Check if this story still exists in Firebase
+        final snapshot = await _firebaseSaveService.watchStory(title).first;
 
-      for (final entry in snapshot.entries) {
-        final title = entry.key;
-        final storyData = entry.value as Map<String, dynamic>;
+        if (snapshot != null) {
+          // Story exists in Firebase
+          final summary = snapshot['aiSummary'] as String?;
 
-        // Read the aiSummary directly from the raw map.
-        final aiSummary = storyData['aiSummary'] as String?;
-        _savedStories[title] =
-            (aiSummary != null && aiSummary.isNotEmpty) ? aiSummary : null;
+          // Update summary if changed
+          if (summary != null && summary != story.summary) {
+            await _crawlerService.cache.updateSummary(title, summary);
 
-        // If this story isn't in the local crawled list, deserialize and
-        // collect it so we can append it below.
-        if (!localTitles.contains(title)) {
-          try {
-            missingStories.add(NewsStory.fromJson(storyData));
-          } catch (e) {
-            debugPrint('Failed to deserialize saved story "$title": $e');
+            if (mounted) {
+              setState(() {
+                _savedStories[title] = summary;
+              });
+            }
+          }
+
+          // Listen for summary if premium and no summary yet
+          if (widget.isPremium && (summary == null || summary.isEmpty)) {
+            _listenForSummary(title);
+          }
+        } else {
+          // Story was deleted on another device - remove from local cache
+          await _crawlerService.cache.removeBookmark(title);
+
+          if (mounted) {
+            setState(() {
+              _savedStories.remove(title);
+            });
           }
         }
-
-        // If the summary is still pending and the user is premium,
-        // open a one-shot listener so the card updates when it arrives.
-        if (_savedStories[title] == null && widget.isPremium) {
-          _listenForSummary(title);
-        }
       }
-
-      // Append any stories that exist in Firebase but not locally.
-      if (missingStories.isNotEmpty) {
-        _stories.addAll(missingStories);
-      }
-    });
+    } catch (e) {
+      print('Failed to sync Firebase bookmarks: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -166,40 +187,42 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     setState(() {
       if (isCurrentlySaved) {
         _savedStories.remove(title);
-        // Cancel any pending listener for this title
         _summaryListeners.remove(title)?.cancel();
       } else {
-        // null = saved but summary pending
         _savedStories[title] = null;
       }
     });
 
     try {
       if (isCurrentlySaved) {
+        // Remove from Firebase
         await _firebaseSaveService.deleteStory(title);
+        // Update local cache
+        await _cacheService.removeBookmark(title);
       } else {
+        // Save to Firebase
         await _firebaseSaveService.saveStory(story);
+        // Save to local cache
+        await _cacheService.saveBookmarkedStory(story);
       }
     } catch (e) {
-      // Rollback only if the Firestore write itself failed.
+      // Rollback on failure
       setState(() {
         if (isCurrentlySaved) {
-          _savedStories[title] = null; // restore as saved (summary unknown)
+          _savedStories[title] = null;
         } else {
-          _savedStories.remove(title); // undo the optimistic add
+          _savedStories.remove(title);
         }
       });
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Failed to update")));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to update"))
+        );
       }
-      return; // don't proceed to summary generation if the write failed
+      return;
     }
 
-    // Only reached if the Firestore write succeeded.
-    // Summary generation is premium-only — non-premium users still get the
-    // bookmark, but the AI summary card won't appear.
+    // Generate summary for premium users
     if (!isCurrentlySaved && widget.isPremium) {
       _generateAndUploadSummary(story);
       _listenForSummary(title);
@@ -240,6 +263,10 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
             }
           });
         }
+
+        // Update summary in local cache
+        _cacheService.updateSummary(title, summary);
+
         // Cancel and remove the listener — we no longer need it.
         _summaryListeners.remove(title)?.cancel();
       }
@@ -248,12 +275,10 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
 
     _summaryListeners[title] = sub;
   }
-
   // ---------------------------------------------------------------------------
   // News refresh
   // ---------------------------------------------------------------------------
   Future<void> _refreshNews() async {
-    setState(() => _isLoading = true);
     try {
       await _crawlerService.fetchAllSources();
       final articles = _crawlerService.localRepo.getArticles();
@@ -263,7 +288,6 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
       if (mounted) {
         setState(() {
           _stories = grouped;
-          _isLoading = false;
         });
       }
     } catch (e) {

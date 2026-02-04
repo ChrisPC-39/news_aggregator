@@ -47,7 +47,6 @@ class CrawlerService {
 
   Future<void> refreshStories() async {
     _processingController.add(true);
-    final stopwatch = Stopwatch()..start();
 
     // 1. Load articles from local storage
     final rawArticles = localRepo.getArticles();
@@ -56,8 +55,10 @@ class CrawlerService {
       return;
     }
 
-    // 2. Pre-process / Deduplicate raw articles
-    // Doing this before grouping saves thousands of similarity checks
+    // 2. Load existing cached stories to preserve isSaved flags
+    final existingStories = cache.load();
+
+    // 3. Pre-process / Deduplicate raw articles
     final Map<String, Article> uniqueMap = {};
     for (var a in rawArticles) {
       final key = '${a.sourceName}::${a.title.trim().toLowerCase()}';
@@ -68,27 +69,24 @@ class CrawlerService {
     }
     final deduplicatedArticles = uniqueMap.values.toList();
 
-    // 3. WARM UP: Trigger RegEx/Normalization in parallel
-    // This ensures ScoreService finds the data already cached in the Article model
+    // 4. WARM UP: Trigger RegEx/Normalization in parallel
     await Future.wait(
       deduplicatedArticles.map((a) async => a.normalizedTokens),
     );
 
-    // 4. Group articles using the optimized ScoreService
-    final grouped = scoreService.groupArticles(deduplicatedArticles);
+    // 5. Group articles using the optimized ScoreService (preserve saved flags)
+    final grouped = scoreService.groupArticles(
+      deduplicatedArticles,
+      existingStories: existingStories, // ✅ Pass existing stories
+    );
 
-    stopwatch.stop();
-    // print(
-    //   '⚡ Grouping completed: ${grouped.length} stories from ${deduplicatedArticles.length} articles in ${stopwatch.elapsedMilliseconds}ms',
-    // );
-
-    // 5. Save to cache and notify UI
+    // 6. Save to cache and notify UI
     await cache.save(grouped);
     _processingController.add(false);
   }
 
   Future<void> fetchAllSources() async {
-    final totalStopwatch = Stopwatch()..start();
+    // final totalStopwatch = Stopwatch()..start();
     // print('\n🚀 Starting fetchAllSources (parallel)...\n');
 
     final futures =
@@ -109,11 +107,11 @@ class CrawlerService {
 
     // print('\n📊 Total articles crawled: ${allArticles.length}');
 
-    final saveStopwatch = Stopwatch()..start();
+    // final saveStopwatch = Stopwatch()..start();
     await localRepo.saveArticles(allArticles);
-    saveStopwatch.stop();
+    // saveStopwatch.stop();
 
-    totalStopwatch.stop();
+    // totalStopwatch.stop();
     // print('  ⏱️  Saving to Hive: ${saveStopwatch.elapsedMilliseconds}ms');
     // print('✅ Total crawl time: ${totalStopwatch.elapsedMilliseconds}ms\n');
 

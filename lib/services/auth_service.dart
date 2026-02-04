@@ -40,6 +40,25 @@ class AuthService {
     }
   }
 
+  Future<String?> resetPassword(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return null; // Success
+    } on FirebaseAuthException catch (e) {
+      // Map Firebase error codes to user-friendly messages
+      switch (e.code) {
+        case 'invalid-email':
+          return "The email address is badly formatted.";
+        case 'user-not-found':
+          return "No user found with this email.";
+        default:
+          return e.message ?? "An unknown error occurred.";
+      }
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
   /// Creates the initial user document in Firestore.
   /// All new users start as non-premium, non-admin.
   Future<void> _createUserDocument(String uid, String email) async {

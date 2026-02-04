@@ -149,24 +149,43 @@ class _LoginPageState extends State<LoginPage> {
                             icon: Icons.lock_outline,
                             controller: _passwordController,
                           ),
+                          const SizedBox(height: 5),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                // Add your reset logic here
+                                _handleForgotPassword();
+                              },
+                              child: Text(
+                                "Forgot Password?",
+                                style: GoogleFonts.lexend(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 30),
 
                           // Action Button
                           _buildSubmitButton(),
 
-                          const SizedBox(height: 25),
-                          const Text(
-                            "or",
-                            style: TextStyle(color: Colors.white60),
-                          ),
-                          const SizedBox(height: 25),
-
-                          // Google Login
-                          _buildSocialButton(
-                            label: "Continue with Google",
-                            iconUrl: 'https://freepnglogo.com/images/all_img/google-logo-2025-6ffb.png',
-                            onTap: () {},
-                          ),
+                          // const SizedBox(height: 25),
+                          // const Text(
+                          //   "or",
+                          //   style: TextStyle(color: Colors.white60),
+                          // ),
+                          // const SizedBox(height: 25),
+                          //
+                          // // Google Login
+                          // _buildSocialButton(
+                          //   label: "Continue with Google",
+                          //   iconUrl: 'https://freepnglogo.com/images/all_img/google-logo-2025-6ffb.png',
+                          //   onTap: () {},
+                          // ),
 
                           const SizedBox(height: 20),
 
@@ -183,6 +202,33 @@ class _LoginPageState extends State<LoginPage> {
         ],
       ),
     );
+  }
+
+  void _handleForgotPassword() async {
+    final String email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      _showErrorSnackBar("Please enter your email to reset your password.");
+      return;
+    }
+
+    // Show a simple loading indicator or just call the service
+    final String? error = await AuthService().resetPassword(email);
+
+    if (error != null) {
+      _showErrorSnackBar(error);
+    } else {
+      // Show a success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Password reset email sent! Check your inbox."),
+            backgroundColor: Colors.green.withValues(alpha: 0.8),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSubmitButton() {

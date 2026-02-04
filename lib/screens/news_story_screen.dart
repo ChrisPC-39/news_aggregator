@@ -559,6 +559,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                         (_) => GroupedNewsScreen(
                           story: story,
                           isSaved: isSaved,
+                          crawlerService: _crawlerService,
                           aiSummary: _savedStories[title],
                           isPremium: widget.isPremium,
                           onBookmarkToggle: () => toggleBookmark(story),

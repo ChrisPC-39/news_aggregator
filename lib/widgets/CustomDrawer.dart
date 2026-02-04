@@ -42,13 +42,6 @@ class CustomDrawer extends StatelessWidget {
               children: [
                 _buildUserHeader(user),
                 const SizedBox(height: 20),
-
-                _buildDrawerItem(
-                  icon: Icons.bookmark_outline,
-                  title: 'Saved Stories',
-                  onTap: () => Navigator.pop(context),
-                ),
-
                 // const Padding(
                 //   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 //   child: Divider(color: Colors.white10),
@@ -57,6 +50,12 @@ class CustomDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   icon: Icons.settings_outlined,
                   title: 'Settings',
+                  onTap: () => Navigator.pop(context),
+                ),
+
+                _buildDrawerItem(
+                  icon: Icons.info_outline,
+                  title: 'App Info',
                   onTap: () => Navigator.pop(context),
                 ),
 

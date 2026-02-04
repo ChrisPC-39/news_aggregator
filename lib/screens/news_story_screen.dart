@@ -91,10 +91,6 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
       if (mounted) setState(() => _isLoading = isProcessing);
     });
 
-    // _fetchSavedStories must run after _refreshNews so it compares against
-    // the final crawled list — otherwise _refreshNews overwrites _stories
-    // and wipes out any Firebase stories that were appended.
-    // _refreshNews().then((_) => _fetchSavedStories());
     // ✅ Refresh news and sync Firebase bookmarks in parallel
     _refreshNews();
     _syncFirebaseBookmarks();
@@ -288,6 +284,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
       if (mounted) {
         setState(() {
           _stories = grouped;
+          _isLoading = false;
         });
       }
     } catch (e) {

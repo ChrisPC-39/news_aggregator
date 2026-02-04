@@ -94,6 +94,9 @@ class NewsStoryHive extends HiveObject {
   @HiveField(5)
   List<String>? inferredStoryTypes;
 
+  @HiveField(6, defaultValue: false)
+  bool isSaved;
+
   NewsStoryHive({
     required this.canonicalTitle,
     required this.articles,
@@ -101,6 +104,7 @@ class NewsStoryHive extends HiveObject {
     this.storyTypes,
     this.imageUrl,
     this.inferredStoryTypes,
+    this.isSaved = false
   });
 
   factory NewsStoryHive.fromNewsStory(NewsStory s) => NewsStoryHive(
@@ -110,6 +114,7 @@ class NewsStoryHive extends HiveObject {
     storyTypes: s.storyTypes,
     imageUrl: s.imageUrl,
     inferredStoryTypes: s.inferredStoryTypes,
+    isSaved: s.isSaved
   );
 
   NewsStory toNewsStory() => NewsStory(
@@ -119,5 +124,6 @@ class NewsStoryHive extends HiveObject {
     storyTypes: storyTypes,
     imageUrl: imageUrl,
     inferredStoryTypes: inferredStoryTypes,
+    isSaved: isSaved
   );
 }

@@ -82,4 +82,25 @@ class FirebaseSaveService {
       return storiesMap?[canonicalTitle] as Map<String, dynamic>?;
     });
   }
+
+  // In your FirebaseSaveService class
+
+  /// Fetch all saved stories for the current user
+  Future<List<Map<String, dynamic>>> getAllSavedStories() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return [];
+
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('savedStories')
+          .get();
+
+      return snapshot.docs.map((doc) => doc.data()).toList();
+    } catch (e) {
+      print('Error fetching saved stories: $e');
+      return [];
+    }
+  }
 }

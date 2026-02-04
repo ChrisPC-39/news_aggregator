@@ -27,6 +27,7 @@ Future<void> main() async {
 
   await Hive.openBox<ArticleHive>('articles');
   await Hive.openBox<NewsStoryHive>('groupedStories');
+  await Hive.openBox<NewsStoryHive>('');
 
   // await Hive.box<NewsStoryHive>('groupedStories').clear();
 

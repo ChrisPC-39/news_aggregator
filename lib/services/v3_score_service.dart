@@ -40,18 +40,8 @@ class ScoreService {
   }
 
   /// Groups articles using an Inverted Index to avoid O(n^2) complexity
-  List<NewsStory> groupArticles(List<Article> articles, {List<NewsStory>? existingStories}) {
+  List<NewsStory> groupArticles(List<Article> articles) {
     final List<NewsStory> stories = [];
-
-    // Create a map of existing saved stories by canonical title
-    final Map<String, bool> savedStoriesMap = {};
-    if (existingStories != null) {
-      for (final story in existingStories) {
-        if (story.isSaved) {
-          savedStoriesMap[story.canonicalTitle.toLowerCase().trim()] = true;
-        }
-      }
-    }
 
     // Index: Word -> List of Stories containing that word in the title
     final Map<String, List<NewsStory>> wordIndex = {};
@@ -87,16 +77,12 @@ class ScoreService {
         }
       } else {
         // 3. Create a new story if no match found
-        // ✅ Check if this story was previously saved
-        final isSaved = savedStoriesMap[article.title.toLowerCase().trim()] ?? false;
-
         final newStory = NewsStory(
           canonicalTitle: article.title,
           summary: article.description,
           articles: [article],
           storyTypes: article.category != null ? [article.category!] : null,
           imageUrl: article.urlToImage,
-          isSaved: isSaved, // ✅ Preserve saved status
         );
         stories.add(newStory);
 

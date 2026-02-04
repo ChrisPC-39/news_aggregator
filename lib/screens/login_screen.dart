@@ -276,7 +276,7 @@ class _LoginPageState extends State<LoginPage> {
   }) {
     return TextField(
       controller: controller,
-      obscureText: isPwd ? _obscurePassword : false,
+      obscureText: _obscurePassword,
       style: const TextStyle(color: Colors.white),
       keyboardType: !isPwd ? TextInputType.emailAddress : TextInputType.text,
       textCapitalization: TextCapitalization.none,

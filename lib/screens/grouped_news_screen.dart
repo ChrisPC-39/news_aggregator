@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
+import '../services/crawler_service.dart';
 import '../services/firebase_save_service.dart';
 
 class GroupedNewsScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class GroupedNewsScreen extends StatefulWidget {
   final bool isPremium;
   final String? aiSummary;
   final VoidCallback onBookmarkToggle;
+  final CrawlerService crawlerService;
 
   const GroupedNewsScreen({
     super.key,
@@ -22,6 +24,7 @@ class GroupedNewsScreen extends StatefulWidget {
     required this.isSaved,
     required this.isPremium,
     required this.onBookmarkToggle,
+    required this.crawlerService,
     this.aiSummary,
   });
 
@@ -38,10 +41,12 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
 
   final FirebaseSaveService _firebaseSaveService = FirebaseSaveService();
   StreamSubscription<Map<String, dynamic>?>? _summaryListener;
+  late CrawlerService _crawlerService;
 
   @override
   void initState() {
     super.initState();
+    _crawlerService = widget.crawlerService;
     _isSaved = widget.isSaved;
     _aiSummary = widget.aiSummary;
 
@@ -225,29 +230,43 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
         _summaryListener?.cancel();
         _summaryListener = null;
         _shimmerController.stop();
-      } else if (widget.isPremium) {
-        // Just bookmarked and user is premium — summary is pending.
-        // Start pulsing and open a one-shot listener for the summary.
-        _startAppropriateAnimation();
 
-        _summaryListener = _firebaseSaveService
-            .watchStory(widget.story.canonicalTitle)
-            .listen((data) {
-              final summary = data?['aiSummary'] as String?;
-              if (summary != null && summary.isNotEmpty) {
-                if (mounted) {
-                  setState(() {
-                    _aiSummary = summary;
-                    _startAppropriateAnimation();
-                  });
-                }
-                // Summary arrived — cancel and clean up.
-                _summaryListener?.cancel();
-                _summaryListener = null;
+        // ✅ Remove from local cache
+        _crawlerService.cache.removeBookmark(widget.story.canonicalTitle);
+      } else {
+        // ✅ Save to local cache immediately
+        _crawlerService.cache.saveBookmarkedStory(widget.story);
+
+        if (widget.isPremium) {
+          // Just bookmarked and user is premium — summary is pending.
+          // Start pulsing and open a one-shot listener for the summary.
+          _startAppropriateAnimation();
+
+          _summaryListener = _firebaseSaveService
+              .watchStory(widget.story.canonicalTitle)
+              .listen((data) {
+            final summary = data?['aiSummary'] as String?;
+            if (summary != null && summary.isNotEmpty) {
+              if (mounted) {
+                setState(() {
+                  _aiSummary = summary;
+                  _startAppropriateAnimation();
+                });
+
+                // ✅ Update summary in local cache
+                _crawlerService.cache.updateSummary(
+                  widget.story.canonicalTitle,
+                  summary,
+                );
               }
-            });
+              // Summary arrived — cancel and clean up.
+              _summaryListener?.cancel();
+              _summaryListener = null;
+            }
+          });
+        }
+        // else: just bookmarked but not premium — nothing extra to do.
       }
-      // else: just bookmarked but not premium — nothing extra to do.
     });
   }
 

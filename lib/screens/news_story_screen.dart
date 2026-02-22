@@ -10,6 +10,7 @@ import '../models/news_story_model.dart';
 import '../models/article_model.dart';
 import '../services/crawler_service.dart';
 import '../services/grouped_stories_cache_service.dart';
+import '../services/similarity_settings_service.dart';
 import '../services/summary_service.dart';
 import '../services/firebase_save_service.dart';
 import '../services/v3_score_service.dart';
@@ -115,7 +116,8 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
       for (var story in savedStories) {
         _savedStories[story.canonicalTitle] = story.summary;
         // Listen for summary updates if premium
-        if (widget.isPremium && (story.summary == null || story.summary!.isEmpty)) {
+        if (widget.isPremium &&
+            (story.summary == null || story.summary!.isEmpty)) {
           _listenForSummary(story.canonicalTitle);
         }
       }
@@ -211,9 +213,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
         }
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to update"))
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Failed to update")));
       }
       return;
     }
@@ -271,6 +273,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
 
     _summaryListeners[title] = sub;
   }
+
   // ---------------------------------------------------------------------------
   // News refresh
   // ---------------------------------------------------------------------------
@@ -287,8 +290,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('Error refreshing news: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -296,18 +300,28 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   Future<List<NewsStory>> _groupArticlesInBackground(
     List<Article> articles,
   ) async {
+    final threshold = SimilaritySettingsService().getThreshold();
     final articlesJson = articles.map((a) => a.toJson()).toList();
-    final groupedJson = await compute(_groupArticlesIsolate, articlesJson);
+    final groupedJson = await compute(_groupArticlesIsolate, {
+      'articles': articlesJson,
+      'threshold': threshold,
+    });
     return groupedJson.map((json) => NewsStory.fromJson(json)).toList();
   }
 
   static List<Map<String, dynamic>> _groupArticlesIsolate(
-    List<Map<String, dynamic>> articlesJson,
+    Map<String, dynamic> params,
   ) {
+    final articlesJson = params['articles'] as List<dynamic>;
+    final threshold = params['threshold'] as double;
     final articles =
         articlesJson.map((json) => Article.fromJson(json)).toList();
     final scoreService = ScoreService();
-    final grouped = scoreService.groupArticlesIncremental([], articles);
+    final grouped = scoreService.groupArticlesIncremental(
+      [],
+      articles,
+      threshold,
+    );
 
     for (var story in grouped) {
       final seen = <String>{};
@@ -427,7 +441,10 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                     : const SizedBox.shrink(),
           ),
         ),
-        drawer: CustomDrawer(isPremium: widget.isPremium),
+        drawer: CustomDrawer(
+          isPremium: widget.isPremium,
+          isAdmin: widget.isAdmin,
+        ),
         body: Stack(
           children: [
             _buildBody(filteredStories),

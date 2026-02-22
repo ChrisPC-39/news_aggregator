@@ -1,8 +1,12 @@
+import 'package:news_aggregator/services/similarity_settings_service.dart';
+
 import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/news_story_model.dart';
 
 class ScoreService {
+  final SimilaritySettingsService _settingsService =
+      SimilaritySettingsService();
 
   /// Optimized overlap using pre-computed tokens from the Article model
   double tokenOverlap(Article a, Article b) {
@@ -40,8 +44,13 @@ class ScoreService {
   }
 
   /// Groups articles using an Inverted Index to avoid O(n^2) complexity
-  List<NewsStory> groupArticles(List<Article> articles, {List<NewsStory>? existingStories}) {
+  List<NewsStory> groupArticles(
+    List<Article> articles, {
+    List<NewsStory>? existingStories,
+    double? threshold,
+  }) {
     final List<NewsStory> stories = [];
+    final effectiveThreshold = threshold ?? _settingsService.getThreshold(); // fallback for non-isolate calls
 
     // Create a map of existing saved stories by canonical title
     final Map<String, bool> savedStoriesMap = {};
@@ -72,7 +81,7 @@ class ScoreService {
       for (final story in candidates) {
         final representative = story.articles.first;
 
-        if (similarityScore(article, representative) >= 0.25 &&
+        if (similarityScore(article, representative) >= effectiveThreshold &&
             representative.sourceName != article.sourceName) {
           matchedStory = story;
           break;
@@ -88,7 +97,8 @@ class ScoreService {
       } else {
         // 3. Create a new story if no match found
         // ✅ Check if this story was previously saved
-        final isSaved = savedStoriesMap[article.title.toLowerCase().trim()] ?? false;
+        final isSaved =
+            savedStoriesMap[article.title.toLowerCase().trim()] ?? false;
 
         final newStory = NewsStory(
           canonicalTitle: article.title,
@@ -124,12 +134,14 @@ class ScoreService {
         .map((a) => a.description)
         .firstWhere((d) => d.isNotEmpty, orElse: () => "");
 
-    final existingTypes = story.storyTypes?.map((t) => t.toLowerCase()).toSet() ?? {};
-    final inferred = inferStoryTypes(story)
-        .map((e) => e.toLowerCase())
-        .toSet()
-        .difference(existingTypes)
-        .toList();
+    final existingTypes =
+        story.storyTypes?.map((t) => t.toLowerCase()).toSet() ?? {};
+    final inferred =
+        inferStoryTypes(story)
+            .map((e) => e.toLowerCase())
+            .toSet()
+            .difference(existingTypes)
+            .toList();
 
     story.inferredStoryTypes = inferred.isEmpty ? null : inferred;
   }
@@ -137,11 +149,15 @@ class ScoreService {
   /// Fast type inference with optimized Romanian normalization
   List<String> inferStoryTypes(NewsStory story) {
     // 1. Pre-normalize the story text once
-    final rawText = "${story.canonicalTitle} ${story.summary} ${story.articles.map((a) => a.title).join(' ')}".toLowerCase();
+    final rawText =
+        "${story.canonicalTitle} ${story.summary} ${story.articles.map((a) => a.title).join(' ')}"
+            .toLowerCase();
 
     final normalizedText = rawText
-        .replaceAll('ă', 'a').replaceAll('â', 'a')
-        .replaceAll('î', 'i').replaceAll('ș', 's')
+        .replaceAll('ă', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('î', 'i')
+        .replaceAll('ș', 's')
         .replaceAll('ț', 't');
 
     final Map<String, int> categoryScores = {};
@@ -167,22 +183,29 @@ class ScoreService {
     if (categoryScores.isEmpty) return ['General'];
 
     // Sort by score descending
-    final sorted = categoryScores.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final sorted =
+        categoryScores.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
 
     return sorted.map((e) => e.key).toList();
   }
 
-  List<NewsStory> groupArticlesIncremental(List<NewsStory> existing, List<Article> newArticles) {
+  List<NewsStory> groupArticlesIncremental(
+    List<NewsStory> existing,
+    List<Article> newArticles,
+    double threshold,
+  ) {
     final existingTitles = existing.map((s) => s.canonicalTitle).toSet();
-    final newStories = groupArticles(newArticles);
+    final newStories = groupArticles(newArticles, threshold: threshold);
     final merged = [...existing];
 
     for (var story in newStories) {
       if (!existingTitles.contains(story.canonicalTitle)) {
         merged.add(story);
       } else {
-        final idx = merged.indexWhere((s) => s.canonicalTitle == story.canonicalTitle);
+        final idx = merged.indexWhere(
+          (s) => s.canonicalTitle == story.canonicalTitle,
+        );
         merged[idx].articles.addAll(story.articles);
       }
     }

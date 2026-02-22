@@ -72,11 +72,3 @@ Based on processing a dataset of **~2,000 articles**:
 | **Optimized Indexing** | $O(n \log n)$ | **< 2,000 ms (2 sec)** |
 
 > **Note:** Performance gains are achieved by replacing nested loops with hash-map lookups, reducing the number of similarity checks by over 95%.
-
----
-
-## 🔜 Roadmap
-
-- [ ] **User Accounts**: Firebase Auth implementation for personalized news preferences and profile management.
-- [ ] **Bookmarks**: Securely save articles to a "Read Later" cloud-synced list.
-- [ ] **AI Summaries**: Integration with Gemini Pro to generate 3-bullet point TL;DRs for grouped story clusters.

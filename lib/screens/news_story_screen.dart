@@ -8,6 +8,7 @@ import 'package:news_aggregator/widgets/CustomDrawer.dart';
 import '../globals.dart';
 import '../models/news_story_model.dart';
 import '../models/article_model.dart';
+import '../parsers/default_content_parser.dart';
 import '../services/crawler_service.dart';
 import '../services/grouped_stories_cache_service.dart';
 import '../services/similarity_settings_service.dart';
@@ -56,6 +57,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   // ---------------------------------------------------------------------------
   final CrawlerService _crawlerService = CrawlerService();
   final GroupedStoriesCacheService _cacheService = GroupedStoriesCacheService();
+  final DefaultContentParser _defaultContentParser = DefaultContentParser();
   List<NewsStory> _stories = [];
   bool _isLoading = true;
 
@@ -230,15 +232,31 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   /// Generates the AI summary and writes it to Firestore.
   Future<void> _generateAndUploadSummary(NewsStory story) async {
     try {
-      final summary = await _summaryService.generateSummary(story);
+      final articleContents = <String>[];
+
+      for (final article in story.articles) {
+        debugPrint('Fetching content from: ${article.url}');
+        final content = await _defaultContentParser.fetchContent(article.url);
+        if (content != null && content.isNotEmpty) {
+          articleContents.add('--- ${article.url} ---\n$content');
+        }
+      }
+
+      if (articleContents.isEmpty) {
+        debugPrint('No article content could be fetched for story: ${story.canonicalTitle}');
+        return;
+      }
+
+      final combinedContent = articleContents.join('\n\n');
+      debugPrint('Fetched content from ${articleContents.length}/${story.articles.length} articles');
+
+      final summary = await _summaryService.generateSummary(combinedContent);
       await _firebaseSaveService.updateStorySummary(
         story.canonicalTitle,
         summary,
       );
-      // Note: we don't setState here — the one-shot listener in
-      // _listenForSummary will pick up the change and do it for us.
     } catch (e) {
-      debugPrint("AI Summary generation failed: $e");
+      debugPrint('AI Summary generation failed: $e');
     }
   }
 

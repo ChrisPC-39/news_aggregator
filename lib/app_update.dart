@@ -8,6 +8,15 @@ class AppUpdate {
 
 final List<AppUpdate> changelogData = [
   AppUpdate(
+    version: "v1.0.0-RC1",
+    date: "Feb 2026",
+    changes: [
+      "Custom thresholds",
+      "Hive fix for running in isolate",
+      "Improve AI generated summaries"
+    ],
+  ),
+  AppUpdate(
     version: "v0.1.1-BETA",
     date: "Jan 2026",
     changes: [

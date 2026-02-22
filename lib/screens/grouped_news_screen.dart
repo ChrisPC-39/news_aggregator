@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
@@ -317,12 +318,19 @@ class _GroupedNewsScreenState extends State<GroupedNewsScreen>
             ),
             const SizedBox(height: 16),
             if (summary != null)
-              Text(
-                summary,
-                style: GoogleFonts.lexend(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: 15,
-                  height: 1.6,
+              MarkdownBody(
+                data: summary,
+                styleSheet: MarkdownStyleSheet(
+                  p: GoogleFonts.lexend(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 15,
+                    height: 1.6,
+                  ),
+                  listBullet: GoogleFonts.lexend(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontSize: 15,
+                    height: 1.6,
+                  ),
                 ),
               )
             else

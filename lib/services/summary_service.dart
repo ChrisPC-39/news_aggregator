@@ -3,45 +3,35 @@ import '../models/news_story_model.dart';
 
 class SummaryService {
   /// Generates an AI summary from the articles in a [NewsStory].
-  Future<String> generateSummary(NewsStory story) async {
-    // 1. Format the content from your model
-    // Assuming NewsStory has a list of articles with a 'content' or 'body' field
-    final articleTexts = story.articles
-        .map((a) => "Title: ${a.title}\nContent: ${a.content}\nURL: ${a.url}\nSource: ${a.sourceName}")
-        .join('\n\n---\n\n');
-
+  Future<String> generateSummary(String combinedContent) async {
     final prompt = '''
 Ești un editor de știri imparțial. Rezumă următoarele articole într-un singur paragraf concis, folosind un ton neutru și obiectiv.
 
 INSTRUCȚIUNI STRICTE:
 1. Limba: Răspunde exclusiv în limba română.
-2. Format: Returnează doar text simplu (plain text). Nu folosi Markdown, caractere de tip bold (**) sau titluri. Poti folosi linii noi.
+2. Format: Returnează text sub forma de markdown pentru a afisa continutul intr-un mod cat mai usor de citit de utilizatori.
 3. Obiectivitate: Identifică orice urmă de subiectivism sau părtinire (bias) din sursele oferite.
 
 STRUCTURA RĂSPUNSULUI:
-- Paragraful cu rezumatul.
+- Paragraful cu rezumatul plain text.
 - O linie goală.
 - O listă la final unde enumeri bias-urile identificate pentru fiecare sursă în parte, intr-o lista sub forma de bullet points.
 
 ARTICOLE DE ANALIZAT:
-$articleTexts
+$combinedContent
 ''';
 
     try {
-      // 2. Initialize the model (Gemini 1.5 Flash is the "small/fast" model)
       final model = FirebaseAI.googleAI().generativeModel(
-        model: 'gemini-2.5-flash-lite'
+          model: 'gemini-2.5-flash-lite'
       );
 
-      // 3. Make the API call
       final response = await model.generateContent([
         Content.text(prompt),
       ]);
 
-      // 4. Return the text or a fallback if empty
       return response.text ?? '';
     } catch (e) {
-      // Handle potential quota or network errors
       return 'Error generating summary: $e';
     }
   }

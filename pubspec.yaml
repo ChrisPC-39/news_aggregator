@@ -52,6 +52,7 @@ dependencies:
   google_fonts: ^6.3.2
   firebase_ai: ^3.7.0
   flutter_markdown_plus: ^1.0.7
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +69,10 @@ dev_dependencies:
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+
+flutter_icons:
+  android: true
+  image_path: assets/logo/logo.png
 
 # The following section is specific to Flutter packages.
 flutter:

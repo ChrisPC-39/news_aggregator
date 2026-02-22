@@ -108,22 +108,32 @@ class NewsStoryHive extends HiveObject {
   });
 
   factory NewsStoryHive.fromNewsStory(NewsStory s) => NewsStoryHive(
-    canonicalTitle: s.canonicalTitle,
-    articles: s.articles.map((a) => ArticleHive.fromArticle(a)).toList(),
-    summary: s.summary,
-    storyTypes: s.storyTypes,
-    imageUrl: s.imageUrl,
-    inferredStoryTypes: s.inferredStoryTypes,
-    isSaved: s.isSaved
+      canonicalTitle: s.canonicalTitle,
+      articles: s.articles.map((a) => ArticleHive.fromArticle(a)).toList(),
+      summary: s.summary,
+      storyTypes: s.storyTypes,
+      imageUrl: s.imageUrl,
+      inferredStoryTypes: s.inferredStoryTypes,
+      isSaved: s.isSaved
   );
 
   NewsStory toNewsStory() => NewsStory(
-    canonicalTitle: canonicalTitle,
-    articles: articles.map((a) => a.toArticle()).toList(),
-    summary: summary,
-    storyTypes: storyTypes,
-    imageUrl: imageUrl,
-    inferredStoryTypes: inferredStoryTypes,
-    isSaved: isSaved
+      canonicalTitle: canonicalTitle,
+      articles: articles.map((a) => a.toArticle()).toList(),
+      summary: summary,
+      storyTypes: storyTypes,
+      imageUrl: imageUrl,
+      inferredStoryTypes: inferredStoryTypes,
+      isSaved: isSaved
   );
+}
+
+@HiveType(typeId: 2)
+class SimilaritySettings extends HiveObject {
+  @HiveField(0, defaultValue: 0.25)
+  double threshold;
+
+  SimilaritySettings({
+    this.threshold = 0.25,
+  });
 }

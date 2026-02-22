@@ -24,12 +24,11 @@ Future<void> main() async {
   await Hive.initFlutter();
   Hive.registerAdapter(ArticleHiveAdapter());
   Hive.registerAdapter(NewsStoryHiveAdapter());
+  Hive.registerAdapter(SimilaritySettingsAdapter());
 
   await Hive.openBox<ArticleHive>('articles');
   await Hive.openBox<NewsStoryHive>('groupedStories');
-  await Hive.openBox<NewsStoryHive>('');
-
-  // await Hive.box<NewsStoryHive>('groupedStories').clear();
+  await Hive.openBox<SimilaritySettings>('similaritySettings');
 
   runApp(const MyApp());
 }

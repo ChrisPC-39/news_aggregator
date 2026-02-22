@@ -3,12 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/changelog_screen.dart';
+import '../screens/settings_screen.dart';
 import '../services/auth_service.dart'; // Ensure this path is correct
 
 class CustomDrawer extends StatelessWidget {
+  final bool isAdmin;
   final bool isPremium;
 
-  const CustomDrawer({super.key, required this.isPremium});
+  const CustomDrawer({
+    super.key,
+    required this.isPremium,
+    required this.isAdmin,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +60,17 @@ class CustomDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   icon: Icons.settings_outlined,
                   title: 'Settings',
-                  onTap: () => Navigator.pop(context),
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => SettingsScreen(
+                                isPremium: isPremium,
+                                isAdmin: isAdmin,
+                              ),
+                        ),
+                      ),
                 ),
 
                 _buildDrawerItem(
@@ -69,8 +85,9 @@ class CustomDrawer extends StatelessWidget {
                       ),
                 ),
 
-                const Spacer(), // Pushes logout to the bottom
+                const Spacer(),
 
+                // Pushes logout to the bottom
                 _buildDrawerItem(
                   icon: Icons.logout,
                   title: 'Log out',

@@ -98,8 +98,8 @@ class _FloatingSearchAndFilterState extends State<FloatingSearchAndFilter> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSavedToggle(),
-          const Divider(color: Colors.white10, height: 32),
+          // _buildSavedToggle(),
+          // const Divider(color: Colors.white10, height: 32),
           _buildSectionHeader('CATEGORIES'),
           const SizedBox(height: 12),
           _buildCategoryChips(),

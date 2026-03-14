@@ -2,39 +2,34 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // For compute()
-import 'package:news_aggregator/widgets/CustomDrawer.dart';
 
 import '../globals.dart';
 import '../models/news_story_model.dart';
-import '../models/article_model.dart';
-import '../parsers/default_content_parser.dart';
 import '../services/crawler_service.dart';
-import '../services/grouped_stories_cache_service.dart';
-import '../services/similarity_settings_service.dart';
-import '../services/summary_service.dart';
 import '../services/firebase_save_service.dart';
-import '../services/v3_score_service.dart';
+import '../services/grouped_stories_cache_service.dart';
+import '../services/summary_service.dart';
+import '../parsers/default_content_parser.dart';
+import '../widgets/CustomDrawer.dart';
 import '../widgets/FloatingSearchAndFilter.dart';
 import '../widgets/NewsStoryCard.dart';
 import 'grouped_news_screen.dart';
 
-class NewsStoryScreen extends StatefulWidget {
+class SavedStoriesScreen extends StatefulWidget {
   final bool isPremium;
   final bool isAdmin;
 
-  const NewsStoryScreen({
+  const SavedStoriesScreen({
     super.key,
     required this.isPremium,
     required this.isAdmin,
   });
 
   @override
-  State<NewsStoryScreen> createState() => _NewsStoryScreenState();
+  State<SavedStoriesScreen> createState() => _SavedStoriesScreenState();
 }
 
-class _NewsStoryScreenState extends State<NewsStoryScreen>
-    with SingleTickerProviderStateMixin {
+class _SavedStoriesScreenState extends State<SavedStoriesScreen> {
   // ---------------------------------------------------------------------------
   // Search / filter / scroll state
   // ---------------------------------------------------------------------------
@@ -47,38 +42,36 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   final ScrollController _scrollController = ScrollController();
 
   Set<String> selectedCategories = {};
-  int minimumSources = 2;
-  bool showSavedOnly = false;
+  int minimumSources = 1; // Default 1 — saved stories may have only 1 source
+  bool showSavedOnly = false; // Not used here but kept for widget compatibility
   Set<String> selectedSources =
-      Globals.sourceConfigs.keys.map((source) => source.toLowerCase()).toSet();
+      Globals.sourceConfigs.keys.map((s) => s.toLowerCase()).toSet();
 
   // ---------------------------------------------------------------------------
-  // News data
+  // Data
   // ---------------------------------------------------------------------------
+  final FirebaseSaveService _firebaseSaveService = FirebaseSaveService();
   final CrawlerService _crawlerService = CrawlerService();
   final GroupedStoriesCacheService _cacheService = GroupedStoriesCacheService();
+  final SummaryService _summaryService = SummaryService();
   final DefaultContentParser _defaultContentParser = DefaultContentParser();
+
+  /// All stories loaded from Firebase (never removed mid-session).
   List<NewsStory> _stories = [];
-  bool _isLoading = true;
 
-  // ---------------------------------------------------------------------------
-  // Bookmark + summary state
-  //
-  // Key  = canonicalTitle
-  // Value = null   → saved, but AI summary hasn't arrived yet
-  //       = String → the summary text
-  //
-  // A title that is NOT in this map is simply not bookmarked.
-  // ---------------------------------------------------------------------------
-  final Map<String, String?> _savedStories = {};
+  /// Tracks bookmark state within this session.
+  /// true  = still bookmarked
+  /// false = unbookmarked this session (stays visible until user leaves)
+  final Map<String, bool> _bookmarkState = {};
 
-  /// Active one-shot subscriptions keyed by canonicalTitle.
-  /// Each subscription cancels itself once the summary arrives.
+  /// AI summaries keyed by canonicalTitle.
+  final Map<String, String?> _summaries = {};
+
+  /// Active summary listeners keyed by canonicalTitle.
   final Map<String, StreamSubscription<Map<String, dynamic>?>>
   _summaryListeners = {};
 
-  final SummaryService _summaryService = SummaryService();
-  final FirebaseSaveService _firebaseSaveService = FirebaseSaveService();
+  bool _isLoading = true;
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -87,23 +80,14 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _stories = _crawlerService.cache.load();
-    _loadSavedStoriesFromCache();
-
-    _crawlerService.isProcessing.listen((isProcessing) {
-      if (mounted) setState(() => _isLoading = isProcessing);
-    });
-
-    // ✅ Refresh news and sync Firebase bookmarks in parallel
-    _refreshNews();
-    _syncFirebaseBookmarks();
+    _loadSavedStories();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
-    // Cancel every active one-shot listener.
+    _searchFocusNode.dispose();
     for (final sub in _summaryListeners.values) {
       sub.cancel();
     }
@@ -111,121 +95,114 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     super.dispose();
   }
 
-  void _loadSavedStoriesFromCache() {
-    final savedStories = _crawlerService.cache.loadSaved();
-    setState(() {
-      _savedStories.clear();
-      for (var story in savedStories) {
-        _savedStories[story.canonicalTitle] = story.summary;
-        // Listen for summary updates if premium
-        if (widget.isPremium &&
-            (story.summary == null || story.summary!.isEmpty)) {
-          _listenForSummary(story.canonicalTitle);
-        }
-      }
-    });
-  }
-
   // ---------------------------------------------------------------------------
-  // Firebase: initial load of saved stories
+  // Load saved stories from Firebase
   // ---------------------------------------------------------------------------
+  Future<void> _loadSavedStories() async {
+    setState(() => _isLoading = true);
 
-  /// Sync bookmarks from Firebase without blocking UI
-  Future<void> _syncFirebaseBookmarks() async {
     try {
-      final localSaved = _crawlerService.cache.loadSaved();
+      final rawMap = await _firebaseSaveService.fetchRawStoriesMap();
 
-      for (final story in localSaved) {
-        final title = story.canonicalTitle;
+      final stories = <NewsStory>[];
+      final summaries = <String, String?>{};
+      final bookmarkState = <String, bool>{};
 
-        // Check if this story still exists in Firebase
-        final snapshot = await _firebaseSaveService.watchStory(title).first;
+      for (final entry in rawMap.entries) {
+        try {
+          final storyData = entry.value as Map<String, dynamic>;
+          final story = NewsStory.fromJson(storyData);
+          final title = story.canonicalTitle;
+          final summary = storyData['aiSummary'] as String?;
 
-        if (snapshot != null) {
-          // Story exists in Firebase
-          final summary = snapshot['aiSummary'] as String?;
+          stories.add(story);
+          summaries[title] = summary?.isNotEmpty == true ? summary : null;
+          bookmarkState[title] = true;
 
-          // Update summary if changed
-          if (summary != null && summary != story.summary) {
-            await _crawlerService.cache.updateSummary(title, summary);
-
-            if (mounted) {
-              setState(() {
-                _savedStories[title] = summary;
-              });
-            }
-          }
-
-          // Listen for summary if premium and no summary yet
+          // Listen for summary updates if premium and no summary yet
           if (widget.isPremium && (summary == null || summary.isEmpty)) {
             _listenForSummary(title);
           }
-        } else {
-          // Story was deleted on another device - remove from local cache
-          await _crawlerService.cache.removeBookmark(title);
-
-          if (mounted) {
-            setState(() {
-              _savedStories.remove(title);
-            });
-          }
+        } catch (e) {
+          debugPrint('Failed to parse saved story "${entry.key}": $e');
         }
       }
+
+      if (mounted) {
+        setState(() {
+          _stories = stories;
+          _summaries.addAll(summaries);
+          _bookmarkState.addAll(bookmarkState);
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print('Failed to sync Firebase bookmarks: $e');
+      debugPrint('Error loading saved stories: $e');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Bookmark toggle
+  // Summary listener (same pattern as NewsStoryScreen)
   // ---------------------------------------------------------------------------
-  Future<void> toggleBookmark(NewsStory story) async {
-    final title = story.canonicalTitle;
-    final isCurrentlySaved = _savedStories.containsKey(title);
+  void _listenForSummary(String title) {
+    if (_summaryListeners.containsKey(title)) return;
 
-    // Optimistic update
-    setState(() {
-      if (isCurrentlySaved) {
-        _savedStories.remove(title);
+    final sub = _firebaseSaveService.watchStory(title).listen((data) {
+      final summary = data?['aiSummary'] as String?;
+      if (summary != null && summary.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            if (_bookmarkState.containsKey(title)) {
+              _summaries[title] = summary;
+            }
+          });
+        }
+        _cacheService.updateSummary(title, summary);
         _summaryListeners.remove(title)?.cancel();
-      } else {
-        _savedStories[title] = null;
+      }
+    });
+
+    _summaryListeners[title] = sub;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bookmark toggle — story stays visible until user leaves the screen
+  // ---------------------------------------------------------------------------
+  Future<void> _toggleBookmark(NewsStory story) async {
+    final title = story.canonicalTitle;
+    final isCurrentlySaved = _bookmarkState[title] ?? false;
+
+    // Optimistic update — flip the state but keep the card visible
+    setState(() {
+      _bookmarkState[title] = !isCurrentlySaved;
+      if (isCurrentlySaved) {
+        _summaryListeners.remove(title)?.cancel();
       }
     });
 
     try {
       if (isCurrentlySaved) {
-        // Remove from Firebase
         await _firebaseSaveService.deleteStory(title);
-        // Update local cache
         await _cacheService.removeBookmark(title);
       } else {
-        // Save to Firebase
+        // Re-saving a story that was un-bookmarked this session
         await _firebaseSaveService.saveStory(story);
-        // Save to local cache
         await _cacheService.saveBookmarkedStory(story);
+
+        if (widget.isPremium) {
+          _generateAndUploadSummary(story);
+          _listenForSummary(title);
+        }
       }
     } catch (e) {
-      // Rollback on failure
-      setState(() {
-        if (isCurrentlySaved) {
-          _savedStories[title] = null;
-        } else {
-          _savedStories.remove(title);
-        }
-      });
+      // Rollback
+      setState(() => _bookmarkState[title] = isCurrentlySaved);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Failed to update")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update bookmark')),
+        );
       }
-      return;
-    }
-
-    // Generate summary for premium users
-    if (!isCurrentlySaved && widget.isPremium) {
-      _generateAndUploadSummary(story);
-      _listenForSummary(title);
     }
   }
 
@@ -235,22 +212,17 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
       final articleContents = <String>[];
 
       for (final article in story.articles) {
-        debugPrint('Fetching content from: ${article.url}');
         final content = await _defaultContentParser.fetchContent(article.url);
         if (content != null && content.isNotEmpty) {
           articleContents.add('--- ${article.url} ---\n$content');
         }
       }
 
-      if (articleContents.isEmpty) {
-        debugPrint('No article content could be fetched for story: ${story.canonicalTitle}');
-        return;
-      }
+      if (articleContents.isEmpty) return;
 
-      final combinedContent = articleContents.join('\n\n');
-      debugPrint('Fetched content from ${articleContents.length}/${story.articles.length} articles');
-
-      final summary = await _summaryService.generateSummary(combinedContent);
+      final summary = await _summaryService.generateSummary(
+        articleContents.join('\n\n'),
+      );
       await _firebaseSaveService.updateStorySummary(
         story.canonicalTitle,
         summary,
@@ -258,101 +230,6 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     } catch (e) {
       debugPrint('AI Summary generation failed: $e');
     }
-  }
-
-  /// Opens a Firestore listener on the user doc. As soon as the summary
-  /// field for [title] is non-empty, it updates local state and cancels itself.
-  void _listenForSummary(String title) {
-    // If there's already a listener for this title, don't open another one.
-    if (_summaryListeners.containsKey(title)) return;
-
-    final sub = _firebaseSaveService.watchStory(title).listen((data) {
-      final summary = data?['aiSummary'] as String?;
-
-      if (summary != null && summary.isNotEmpty) {
-        // Summary has arrived — update state and tear down.
-        if (mounted) {
-          setState(() {
-            // Only update if still saved (user might have un-bookmarked)
-            if (_savedStories.containsKey(title)) {
-              _savedStories[title] = summary;
-            }
-          });
-        }
-
-        // Update summary in local cache
-        _cacheService.updateSummary(title, summary);
-
-        // Cancel and remove the listener — we no longer need it.
-        _summaryListeners.remove(title)?.cancel();
-      }
-      // If summary is still null, do nothing — wait for next event.
-    });
-
-    _summaryListeners[title] = sub;
-  }
-
-  // ---------------------------------------------------------------------------
-  // News refresh
-  // ---------------------------------------------------------------------------
-  Future<void> _refreshNews() async {
-    try {
-      await _crawlerService.fetchAllSources();
-      final articles = _crawlerService.localRepo.getArticles();
-      final grouped = await _groupArticlesInBackground(articles);
-      await _crawlerService.cache.save(grouped);
-
-      if (mounted) {
-        setState(() {
-          _stories = grouped;
-          _isLoading = false;
-        });
-      }
-    } catch (e, stackTrace) {
-      debugPrint('Error refreshing news: $e');
-      debugPrint('Stack trace: $stackTrace');
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<List<NewsStory>> _groupArticlesInBackground(
-    List<Article> articles,
-  ) async {
-    final threshold = SimilaritySettingsService().getThreshold();
-    final articlesJson = articles.map((a) => a.toJson()).toList();
-    final groupedJson = await compute(_groupArticlesIsolate, {
-      'articles': articlesJson,
-      'threshold': threshold,
-    });
-    return groupedJson.map((json) => NewsStory.fromJson(json)).toList();
-  }
-
-  static List<Map<String, dynamic>> _groupArticlesIsolate(
-    Map<String, dynamic> params,
-  ) {
-    final articlesJson = params['articles'] as List<dynamic>;
-    final threshold = params['threshold'] as double;
-    final articles =
-        articlesJson.map((json) => Article.fromJson(json)).toList();
-    final scoreService = ScoreService();
-    final grouped = scoreService.groupArticlesIncremental(
-      [],
-      articles,
-      threshold,
-    );
-
-    for (var story in grouped) {
-      final seen = <String>{};
-      story.articles.retainWhere((article) {
-        final key =
-            '${article.sourceName}::${article.title.trim().toLowerCase()}';
-        if (seen.contains(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    }
-    grouped.removeWhere((story) => story.articles.isEmpty);
-    return grouped.map((story) => story.toJson()).toList();
   }
 
   // ---------------------------------------------------------------------------
@@ -369,16 +246,11 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Filtering
+  // Filtering — identical logic to NewsStoryScreen, minus the saved-only toggle
   // ---------------------------------------------------------------------------
   List<NewsStory> _applyAllFilters(List<NewsStory> stories) {
     return stories.where((story) {
-      // 1. Saved filter (High priority/Early exit)
-      if (showSavedOnly && !_savedStories.containsKey(story.canonicalTitle)) {
-        return false;
-      }
-
-      // 2. Source Filter
+      // 1. Source filter
       final storySourceIds =
           story.articles.map((a) => a.sourceName.toLowerCase()).toSet();
       final hasActiveSource = storySourceIds.any(
@@ -386,24 +258,23 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
       );
       if (!hasActiveSource) return false;
 
-      // 3. Category Filter
+      // 2. Category filter
       if (selectedCategories.isNotEmpty) {
         final allTypes = <String>{
           ...?story.storyTypes?.map((e) => e.toLowerCase().trim()),
           ...?story.inferredStoryTypes?.map((e) => e.toLowerCase().trim()),
         };
-        // Check if the story contains ALL selected categories
         if (allTypes.isEmpty || !selectedCategories.every(allTypes.contains)) {
           return false;
         }
       }
 
-      // 4. Minimum Sources Filter
+      // 3. Minimum sources filter
       final uniqueSourcesCount =
           story.articles.map((a) => a.sourceName).toSet().length;
       if (uniqueSourcesCount < minimumSources) return false;
 
-      // 5. Search Filter
+      // 4. Search filter
       if (_searchQuery.isNotEmpty) {
         final q = Globals.normalizeDiacritics(_searchQuery).trim();
         final normalizedTitle = Globals.normalizeDiacritics(
@@ -412,7 +283,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
         final normalizedSummary = Globals.normalizeDiacritics(
           story.summary ?? '',
         );
-        return normalizedTitle.contains(q) || (normalizedSummary.contains(q));
+        return normalizedTitle.contains(q) || normalizedSummary.contains(q);
       }
 
       return true;
@@ -430,7 +301,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
       onTap: () => _searchFocusNode.unfocus(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Stories'),
+          title: const Text('Saved Stories'),
           backgroundColor: Theme.of(context).primaryColor,
           foregroundColor: Colors.white,
           actions: [
@@ -462,7 +333,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
         drawer: CustomDrawer(
           isPremium: widget.isPremium,
           isAdmin: widget.isAdmin,
-          activeScreen: ActiveScreen.news
+          activeScreen: ActiveScreen.saved
         ),
         body: Stack(
           children: [
@@ -475,12 +346,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
               searchController: _searchController,
               searchQuery: _searchQuery,
               searchFocusNode: _searchFocusNode,
-              showSavedOnly: showSavedOnly,
-              onSavedOnlyToggled: (value) {
-                setState(() {
-                  showSavedOnly = value;
-                });
-              },
+              // Hide the saved-only toggle — not relevant on this screen
+              showSavedOnly: false,
+              onSavedOnlyToggled: (_) {},
               onSourceToggled: (source, isSelected) {
                 setState(() {
                   final allSources =
@@ -533,8 +401,29 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
   }
 
   Widget _buildBody(List<NewsStory> stories) {
-    if (_stories.isEmpty && _isLoading) {
+    if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_stories.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.bookmark_border, size: 48, color: Colors.white38),
+            SizedBox(height: 16),
+            Text(
+              'No saved stories yet.',
+              style: TextStyle(color: Colors.white60),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Bookmark a story to see it here.',
+              style: TextStyle(color: Colors.white38, fontSize: 13),
+            ),
+          ],
+        ),
+      );
     }
 
     if (stories.isEmpty) {
@@ -545,7 +434,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                 : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('No news found.'),
+                    const Text('No stories match the current filters.'),
                     TextButton(
                       onPressed:
                           () => setState(() {
@@ -553,10 +442,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                             _searchQuery = '';
                             selectedCategories.clear();
                             minimumSources = 1;
-                            showSavedOnly = false;
                             selectedSources =
                                 Globals.sourceConfigs.keys
-                                    .map((source) => source.toLowerCase())
+                                    .map((s) => s.toLowerCase())
                                     .toSet();
                           }),
                       child: const Text('Clear filters'),
@@ -567,7 +455,7 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _isLoading ? () async {} : _refreshNews,
+      onRefresh: _loadSavedStories,
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.only(top: 8, bottom: 80),
@@ -575,15 +463,14 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
         itemBuilder: (context, index) {
           final story = stories[index];
           final title = story.canonicalTitle;
-          final isSaved = _savedStories.containsKey(title);
+          final isSaved = _bookmarkState[title] ?? false;
 
           return NewsStoryCard(
             story: story,
             isSaved: isSaved,
-            // null if not saved, or if saved but summary hasn't arrived
-            aiSummary: _savedStories[title],
+            aiSummary: _summaries[title],
             isPremium: widget.isPremium,
-            onBookmarkToggle: () => toggleBookmark(story),
+            onBookmarkToggle: () => _toggleBookmark(story),
             onTap:
                 () => Navigator.push(
                   context,
@@ -593,9 +480,9 @@ class _NewsStoryScreenState extends State<NewsStoryScreen>
                           story: story,
                           isSaved: isSaved,
                           crawlerService: _crawlerService,
-                          aiSummary: _savedStories[title],
+                          aiSummary: _summaries[title],
                           isPremium: widget.isPremium,
-                          onBookmarkToggle: () => toggleBookmark(story),
+                          onBookmarkToggle: () => _toggleBookmark(story),
                         ),
                   ),
                 ),

@@ -8,6 +8,15 @@ class AppUpdate {
 
 final List<AppUpdate> changelogData = [
   AppUpdate(
+    version: "v1.0.0",
+    date: "Mar 2026",
+    changes: [
+      "Display bookmarks in separate screen",
+      "Improve performance when refreshing",
+      "Add better highlights in drawer"
+    ],
+  ),
+  AppUpdate(
     version: "v1.0.0-RC1",
     date: "Feb 2026",
     changes: [

@@ -8,6 +8,14 @@ class AppUpdate {
 
 final List<AppUpdate> changelogData = [
   AppUpdate(
+    version: "v1.1.0",
+    date: "Sep 2026",
+    changes: [
+      "Timeouts on news sources (10 seconds)",
+      "New similarity threshold default: 0.3%"
+    ],
+  ),
+  AppUpdate(
     version: "v1.0.0",
     date: "Mar 2026",
     changes: [
@@ -31,7 +39,6 @@ final List<AppUpdate> changelogData = [
     changes: [
       "Major UI overhaul",
       "Added ability to bookmark stories (synced with account)",
-      "Bug fixes",
     ],
   ),
   AppUpdate(

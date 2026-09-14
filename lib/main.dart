@@ -25,10 +25,12 @@ Future<void> main() async {
   Hive.registerAdapter(ArticleHiveAdapter());
   Hive.registerAdapter(NewsStoryHiveAdapter());
   Hive.registerAdapter(SimilaritySettingsAdapter());
+  Hive.registerAdapter(CrawlLogHiveAdapter());
 
   await Hive.openBox<ArticleHive>('articles');
   await Hive.openBox<NewsStoryHive>('groupedStories');
   await Hive.openBox<SimilaritySettings>('similaritySettings');
+  await Hive.openBox<CrawlLogHive>('crawlLogs');
 
   runApp(const MyApp());
 }

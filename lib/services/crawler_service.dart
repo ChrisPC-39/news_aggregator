@@ -28,11 +28,13 @@ import '../parsers/stiri_pe_surse_parser.dart';
 import '../parsers/tvr_info_parser.dart';
 import 'local_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
+import 'crawl_log_service.dart';
 
 class CrawlerService {
   final localRepo = LocalArticleRepository();
   final scoreService = ScoreService();
   final GroupedStoriesCacheService cache = GroupedStoriesCacheService();
+  final CrawlLogService logService = CrawlLogService();
 
   final _processingController = StreamController<bool>.broadcast();
 
@@ -92,7 +94,25 @@ class CrawlerService {
     final futures =
         Globals.sourceConfigs.values.map((url) async {
           final siteStopwatch = Stopwatch()..start();
-          final articles = await crawlSite(url);
+          List<Article> articles;
+          try {
+            // Hard cap: a single slow/hanging source can no longer stall the
+            // whole refresh - give up on it after 10s and move on.
+            articles = await crawlSite(url).timeout(
+              const Duration(seconds: 10),
+              onTimeout: () async {
+                final domain = Uri.parse(url).host.replaceFirst('www.', '');
+                print('⏱️  $domain timed out after 10s - skipping');
+                await logService.logTimeout(sourceName: domain, url: url);
+                return <Article>[];
+              },
+            );
+          } catch (e) {
+            final domain = Uri.parse(url).host.replaceFirst('www.', '');
+            print('  ❌ Error crawling $domain: $e');
+            await logService.logError(sourceName: domain, url: url, error: e);
+            articles = <Article>[];
+          }
           siteStopwatch.stop();
 
           final domain = Uri.parse(url).host.replaceFirst('www.', '');

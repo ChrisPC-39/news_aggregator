@@ -6,11 +6,12 @@ import '../screens/changelog_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/saved_stories_screen.dart';
 import '../screens/news_story_screen.dart';
+import '../screens/logs_screen.dart';
 import '../services/auth_service.dart';
 
 /// Identifies which top-level screen is currently active.
 /// Pass this into [CustomDrawer] so it can highlight the correct item.
-enum ActiveScreen { news, saved, settings, appInfo }
+enum ActiveScreen { news, saved, settings, logs, appInfo }
 
 class CustomDrawer extends StatelessWidget {
   final bool isAdmin;
@@ -116,6 +117,22 @@ class CustomDrawer extends StatelessWidget {
                           isPremium: isPremium,
                           isAdmin: isAdmin,
                         ),
+                      ),
+                    );
+                  },
+                ),
+
+                _buildDrawerItem(
+                  context: context,
+                  icon: Icons.bug_report_outlined,
+                  title: 'Logs',
+                  isActive: activeScreen == ActiveScreen.logs,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LogsScreen(),
                       ),
                     );
                   },

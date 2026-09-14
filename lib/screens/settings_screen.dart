@@ -160,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Center(
                 child: TextButton.icon(
                   onPressed: () async {
-                    setState(() => _currentThreshold = 0.25);
+                    setState(() => _currentThreshold = 0.30);
                   },
                   icon: const Icon(
                     Icons.refresh,
@@ -168,7 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: Colors.white60,
                   ),
                   label: const Text(
-                    'Reset to Default (25%)',
+                    'Reset to Default (30%)',
                     style: TextStyle(color: Colors.white60),
                   ),
                 ),

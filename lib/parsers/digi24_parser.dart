@@ -67,7 +67,7 @@ class Digi24Parser extends BaseParser {
   Future<Map<String, DateTime>> _fetchRssDates() async {
     final dateMap = <String, DateTime>{};
 
-    final response = await http.get(Uri.parse(_rssUrl));
+    final response = await http.get(Uri.parse(_rssUrl)).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) return dateMap;
 
     final document = xml.XmlDocument.parse(
@@ -118,7 +118,7 @@ class Digi24Parser extends BaseParser {
         'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-    );
+    ).timeout(const Duration(seconds: 10));
 
     if (response.statusCode != 200) return articles;
 

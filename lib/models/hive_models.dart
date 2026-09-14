@@ -137,3 +137,31 @@ class SimilaritySettings extends HiveObject {
     this.threshold = 0.25,
   });
 }
+
+/// Records a source that failed to load during a crawl (timeout or error),
+/// so it can be reviewed later from the Logs screen.
+@HiveType(typeId: 3)
+class CrawlLogHive extends HiveObject {
+  @HiveField(0)
+  String sourceName;
+
+  @HiveField(1)
+  String url;
+
+  @HiveField(2)
+  String status;
+
+  @HiveField(3)
+  String message;
+
+  @HiveField(4)
+  DateTime timestamp;
+
+  CrawlLogHive({
+    required this.sourceName,
+    required this.url,
+    required this.status,
+    required this.message,
+    required this.timestamp,
+  });
+}

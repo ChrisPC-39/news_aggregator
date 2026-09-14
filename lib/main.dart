@@ -31,6 +31,7 @@ Future<void> main() async {
   await Hive.openBox<NewsStoryHive>('groupedStories');
   await Hive.openBox<SimilaritySettings>('similaritySettings');
   await Hive.openBox<CrawlLogHive>('crawlLogs');
+  await Hive.openBox('appSettings'); // untyped: disabled-source list, etc.
 
   runApp(const MyApp());
 }

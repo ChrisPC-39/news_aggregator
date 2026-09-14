@@ -7,11 +7,12 @@ import '../screens/settings_screen.dart';
 import '../screens/saved_stories_screen.dart';
 import '../screens/news_story_screen.dart';
 import '../screens/logs_screen.dart';
+import '../screens/manage_sources_screen.dart';
 import '../services/auth_service.dart';
 
 /// Identifies which top-level screen is currently active.
 /// Pass this into [CustomDrawer] so it can highlight the correct item.
-enum ActiveScreen { news, saved, settings, logs, appInfo }
+enum ActiveScreen { news, saved, settings, sources, logs, appInfo }
 
 class CustomDrawer extends StatelessWidget {
   final bool isAdmin;
@@ -117,6 +118,22 @@ class CustomDrawer extends StatelessWidget {
                           isPremium: isPremium,
                           isAdmin: isAdmin,
                         ),
+                      ),
+                    );
+                  },
+                ),
+
+                _buildDrawerItem(
+                  context: context,
+                  icon: Icons.rss_feed,
+                  title: 'Sources',
+                  isActive: activeScreen == ActiveScreen.sources,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ManageSourcesScreen(),
                       ),
                     );
                   },

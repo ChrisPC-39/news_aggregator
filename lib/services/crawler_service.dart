@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:news_aggregator/services/v3_score_service.dart';
-import '../globals.dart';
 import '../models/article_model.dart';
 import '../models/base_parser.dart';
 import '../models/news_story_model.dart';
@@ -29,12 +28,14 @@ import '../parsers/tvr_info_parser.dart';
 import 'local_article_repository.dart';
 import 'grouped_stories_cache_service.dart';
 import 'crawl_log_service.dart';
+import 'source_settings_service.dart';
 
 class CrawlerService {
   final localRepo = LocalArticleRepository();
   final scoreService = ScoreService();
   final GroupedStoriesCacheService cache = GroupedStoriesCacheService();
   final CrawlLogService logService = CrawlLogService();
+  final SourceSettingsService sourceSettings = SourceSettingsService();
 
   final _processingController = StreamController<bool>.broadcast();
 
@@ -91,8 +92,10 @@ class CrawlerService {
     // final totalStopwatch = Stopwatch()..start();
     // print('\n🚀 Starting fetchAllSources (parallel)...\n');
 
+    // Skip sources the user has disabled entirely - fewer requests in
+    // flight means a faster refresh, not just a filtered result.
     final futures =
-        Globals.sourceConfigs.values.map((url) async {
+        sourceSettings.getEnabledSourceConfigs().values.map((url) async {
           final siteStopwatch = Stopwatch()..start();
           List<Article> articles;
           try {

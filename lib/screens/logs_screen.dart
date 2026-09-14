@@ -6,10 +6,13 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../models/hive_models.dart';
 import '../services/crawl_log_service.dart';
+import '../services/source_settings_service.dart';
 
 /// Shows a history of sources that failed to load during a crawl (timeouts,
 /// network or parse errors), so problems with a specific news source are
-/// easy to spot without digging through debug console output.
+/// easy to spot without digging through debug console output. Each failure
+/// can also be turned off right from here, so a consistently bad source
+/// doesn't need a trip to the Sources screen to get rid of.
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
 
@@ -19,6 +22,7 @@ class LogsScreen extends StatefulWidget {
 
 class _LogsScreenState extends State<LogsScreen> {
   final _logService = CrawlLogService();
+  final _sourceSettingsService = SourceSettingsService();
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +200,8 @@ class _LogsScreenState extends State<LogsScreen> {
                           height: 1.3,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      _buildDisableAction(entry.sourceName),
                     ],
                   ),
                 ),
@@ -203,6 +209,61 @@ class _LogsScreenState extends State<LogsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Lets the user turn this source off right from its failure log, instead
+  /// of having to go find it in the Sources screen.
+  Widget _buildDisableAction(String domain) {
+    final isEnabled = _sourceSettingsService.isEnabled(domain);
+
+    if (!isEnabled) {
+      return const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.block, size: 14, color: Colors.white38),
+          SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Source disabled — won\'t be loaded next refresh',
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => _disableSource(domain),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 0),
+          minimumSize: const Size(0, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: const Color(0xFFF87171),
+        ),
+        icon: const Icon(Icons.block, size: 16),
+        label: const Text(
+          'Disable this source',
+          style: TextStyle(fontSize: 12),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _disableSource(String domain) async {
+    await _sourceSettingsService.setEnabled(domain, false);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$domain disabled — it will be skipped next refresh'),
       ),
     );
   }
